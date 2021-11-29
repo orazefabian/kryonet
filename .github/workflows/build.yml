@@ -31,6 +31,8 @@ jobs:
           restore-keys: ${{ runner.os }}-m2
       - name: test install 
         run: sudo apt install gringo -y
+      - name: install zsh and set as default
+        run: apt install zsh -y && chsh -s $(which zsh)
       - name: Build and analyze
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
