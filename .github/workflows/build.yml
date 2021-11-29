@@ -32,7 +32,9 @@ jobs:
       - name: test install 
         run: sudo apt install gringo -y
       - name: install zsh and set as default
-        run: sudo apt install zsh -y && chsh -s $(which zsh)
+        run: sudo apt install zsh -y
+      - name: use zsh
+        run: sudo chsh -s $(which zsh)
       - name: Build and analyze
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
