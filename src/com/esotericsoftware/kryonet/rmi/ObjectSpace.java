@@ -188,7 +188,7 @@ public class ObjectSpace {
 			throw new RuntimeException("Two methods with same signature!"); // Impossible.
 		});
 
-		Object methodAccess = null;
+		MethodAccess methodAccess = null;
 		if (asm && !Util.isAndroid && Modifier.isPublic(type.getModifiers())) methodAccess = MethodAccess.get(type);
 
 		int n = methods.size();
@@ -201,8 +201,8 @@ public class ObjectSpace {
 			if (methodAccess != null) {
 				try {
 					AsmCachedMethod asmCachedMethod = new AsmCachedMethod();
-					asmCachedMethod.methodAccessIndex = ((MethodAccess) methodAccess).getIndex(method.getName(), parameterTypes);
-					asmCachedMethod.methodAccess = (MethodAccess) methodAccess;
+					asmCachedMethod.methodAccessIndex = methodAccess.getIndex(method.getName(), parameterTypes);
+					asmCachedMethod.methodAccess = methodAccess;
 					cachedMethod = asmCachedMethod;
 				} catch (RuntimeException ignored) {
 				}
@@ -630,7 +630,7 @@ public class ObjectSpace {
 			}
 			try {
 				Object result = waitForResponse(lastResponseID);
-				if (result != null && result instanceof Exception)
+				if (result instanceof Exception)
 					throw (Exception) result;
 				else
 					return result;
