@@ -170,8 +170,7 @@ public class ObjectSpace {
 			if (nextClass == Object.class) break;
 		}
 		ArrayList<Method> methods = new ArrayList(Math.max(1, allMethods.size()));
-		for (int i = 0, n = allMethods.size(); i < n; i++) {
-			Method method = allMethods.get(i);
+		for (Method method : allMethods) {
 			int modifiers = method.getModifiers();
 			if (Modifier.isStatic(modifiers)) continue;
 			if (Modifier.isPrivate(modifiers)) continue;
@@ -238,12 +237,11 @@ public class ObjectSpace {
 	 */
 	static Object getRegisteredObject(Connection connection, int objectID) {
 		ObjectSpace[] instances = ObjectSpace.instances;
-		for (int i = 0, n = instances.length; i < n; i++) {
-			ObjectSpace objectSpace = instances[i];
+		for (ObjectSpace objectSpace : instances) {
 			// Check if the connection is in this ObjectSpace.
 			Connection[] connections = objectSpace.connections;
-			for (int j = 0; j < connections.length; j++) {
-				if (connections[j] != connection) continue;
+			for (Connection value : connections) {
+				if (value != connection) continue;
 				// Find an object with the objectID.
 				Object object = objectSpace.idToObject.get(objectID);
 				if (object != null) return object;
@@ -258,12 +256,11 @@ public class ObjectSpace {
 	 */
 	static int getRegisteredID(Connection connection, Object object) {
 		ObjectSpace[] instances = ObjectSpace.instances;
-		for (int i = 0, n = instances.length; i < n; i++) {
-			ObjectSpace objectSpace = instances[i];
+		for (ObjectSpace objectSpace : instances) {
 			// Check if the connection is in this ObjectSpace.
 			Connection[] connections = objectSpace.connections;
-			for (int j = 0; j < connections.length; j++) {
-				if (connections[j] != connection) continue;
+			for (Connection value : connections) {
+				if (value != connection) continue;
 				// Find an ID with the object.
 				int id = objectSpace.objectToID.get(object, Integer.MAX_VALUE);
 				if (id != Integer.MAX_VALUE) return id;
@@ -373,8 +370,7 @@ public class ObjectSpace {
 	 */
 	public void close() {
 		Connection[] connections = this.connections;
-		for (int i = 0; i < connections.length; i++)
-			connections[i].removeListener(invokeListener);
+		for (Connection connection : connections) connection.removeListener(invokeListener);
 
 		synchronized (instancesLock) {
 			ArrayList<ObjectSpace> temp = new ArrayList(Arrays.asList(instances));
@@ -585,8 +581,7 @@ public class ObjectSpace {
 			invokeMethod.args = args;
 
 			CachedMethod[] cachedMethods = getMethods(connection.getEndPoint().getKryo(), method.getDeclaringClass());
-			for (int i = 0, n = cachedMethods.length; i < n; i++) {
-				CachedMethod cachedMethod = cachedMethods[i];
+			for (CachedMethod cachedMethod : cachedMethods) {
 				if (cachedMethod.method.equals(method)) {
 					invokeMethod.cachedMethod = cachedMethod;
 					break;

@@ -226,8 +226,7 @@ public class Connection {
 		synchronized (listenerLock) {
 			Listener[] listeners = this.listeners;
 			int n = listeners.length;
-			for (int i = 0; i < n; i++)
-				if (listener == listeners[i]) return;
+			for (Listener value : listeners) if (listener == value) return;
 			Listener[] newListeners = new Listener[n + 1];
 			newListeners[0] = listener;
 			System.arraycopy(listeners, 0, newListeners, 1, n);
@@ -267,20 +266,18 @@ public class Connection {
 			}
 		}
 		Listener[] listeners = this.listeners;
-		for (int i = 0, n = listeners.length; i < n; i++)
-			listeners[i].connected(this);
+		for (Listener listener : listeners) listener.connected(this);
 	}
 
 	void notifyDisconnected() {
 		Listener[] listeners = this.listeners;
-		for (int i = 0, n = listeners.length; i < n; i++)
-			listeners[i].disconnected(this);
+		for (Listener listener : listeners) listener.disconnected(this);
 	}
 
 	void notifyIdle() {
 		Listener[] listeners = this.listeners;
-		for (int i = 0, n = listeners.length; i < n; i++) {
-			listeners[i].idle(this);
+		for (Listener listener : listeners) {
+			listener.idle(this);
 			if (!isIdle()) break;
 		}
 	}
@@ -299,8 +296,7 @@ public class Connection {
 			}
 		}
 		Listener[] listeners = this.listeners;
-		for (int i = 0, n = listeners.length; i < n; i++)
-			listeners[i].received(this, object);
+		for (Listener listener : listeners) listener.received(this, object);
 	}
 
 	/**

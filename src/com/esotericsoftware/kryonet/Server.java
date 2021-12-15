@@ -55,27 +55,23 @@ public class Server implements EndPoint {
 	private final Listener dispatchListener = new Listener() {
 		public void connected(Connection connection) {
 			Listener[] listeners = Server.this.listeners;
-			for (int i = 0, n = listeners.length; i < n; i++)
-				listeners[i].connected(connection);
+			for (Listener listener : listeners) listener.connected(connection);
 		}
 
 		public void disconnected(Connection connection) {
 			removeConnection(connection);
 			Listener[] listeners = Server.this.listeners;
-			for (int i = 0, n = listeners.length; i < n; i++)
-				listeners[i].disconnected(connection);
+			for (Listener listener : listeners) listener.disconnected(connection);
 		}
 
 		public void received(Connection connection, Object object) {
 			Listener[] listeners = Server.this.listeners;
-			for (int i = 0, n = listeners.length; i < n; i++)
-				listeners[i].received(connection, object);
+			for (Listener listener : listeners) listener.received(connection, object);
 		}
 
 		public void idle(Connection connection) {
 			Listener[] listeners = Server.this.listeners;
-			for (int i = 0, n = listeners.length; i < n; i++)
-				listeners[i].idle(connection);
+			for (Listener listener : listeners) listener.idle(connection);
 		}
 	};
 	private int nextConnectionID = 1;
@@ -299,8 +295,7 @@ public class Server implements EndPoint {
 						if (fromAddress == null) continue;
 
 						Connection[] connections = this.connections;
-						for (int i = 0, n = connections.length; i < n; i++) {
-							Connection connection = connections[i];
+						for (Connection connection : connections) {
 							if (fromAddress.equals(connection.udpRemoteAddress)) {
 								fromConnection = connection;
 								break;
@@ -377,8 +372,7 @@ public class Server implements EndPoint {
 		}
 		long time = System.currentTimeMillis();
 		Connection[] connections = this.connections;
-		for (int i = 0, n = connections.length; i < n; i++) {
-			Connection connection = connections[i];
+		for (Connection connection : connections) {
 			if (connection.tcp.isTimedOut(time)) {
 				if (DEBUG) debug("kryonet", connection + " timed out.");
 				connection.close();
@@ -392,8 +386,7 @@ public class Server implements EndPoint {
 	private void keepAlive() {
 		long time = System.currentTimeMillis();
 		Connection[] connections = this.connections;
-		for (int i = 0, n = connections.length; i < n; i++) {
-			Connection connection = connections[i];
+		for (Connection connection : connections) {
 			if (connection.tcp.needsKeepAlive(time)) connection.sendTCP(FrameworkMessage.keepAlive);
 		}
 	}
@@ -482,24 +475,21 @@ public class Server implements EndPoint {
 
 	public void sendToAllTCP(Object object) {
 		Connection[] connections = this.connections;
-		for (int i = 0, n = connections.length; i < n; i++) {
-			Connection connection = connections[i];
+		for (Connection connection : connections) {
 			connection.sendTCP(object);
 		}
 	}
 
 	public void sendToAllExceptTCP(int connectionID, Object object) {
 		Connection[] connections = this.connections;
-		for (int i = 0, n = connections.length; i < n; i++) {
-			Connection connection = connections[i];
+		for (Connection connection : connections) {
 			if (connection.id != connectionID) connection.sendTCP(object);
 		}
 	}
 
 	public void sendToTCP(int connectionID, Object object) {
 		Connection[] connections = this.connections;
-		for (int i = 0, n = connections.length; i < n; i++) {
-			Connection connection = connections[i];
+		for (Connection connection : connections) {
 			if (connection.id == connectionID) {
 				connection.sendTCP(object);
 				break;
@@ -509,24 +499,21 @@ public class Server implements EndPoint {
 
 	public void sendToAllUDP(Object object) {
 		Connection[] connections = this.connections;
-		for (int i = 0, n = connections.length; i < n; i++) {
-			Connection connection = connections[i];
+		for (Connection connection : connections) {
 			connection.sendUDP(object);
 		}
 	}
 
 	public void sendToAllExceptUDP(int connectionID, Object object) {
 		Connection[] connections = this.connections;
-		for (int i = 0, n = connections.length; i < n; i++) {
-			Connection connection = connections[i];
+		for (Connection connection : connections) {
 			if (connection.id != connectionID) connection.sendUDP(object);
 		}
 	}
 
 	public void sendToUDP(int connectionID, Object object) {
 		Connection[] connections = this.connections;
-		for (int i = 0, n = connections.length; i < n; i++) {
-			Connection connection = connections[i];
+		for (Connection connection : connections) {
 			if (connection.id == connectionID) {
 				connection.sendUDP(object);
 				break;
@@ -539,8 +526,7 @@ public class Server implements EndPoint {
 		synchronized (listenerLock) {
 			Listener[] listeners = this.listeners;
 			int n = listeners.length;
-			for (int i = 0; i < n; i++)
-				if (listener == listeners[i]) return;
+			for (Listener value : listeners) if (listener == value) return;
 			Listener[] newListeners = new Listener[n + 1];
 			newListeners[0] = listener;
 			System.arraycopy(listeners, 0, newListeners, 1, n);
@@ -572,8 +558,7 @@ public class Server implements EndPoint {
 	public void close() {
 		Connection[] connections = this.connections;
 		if (INFO && connections.length > 0) info("kryonet", "Closing server connections...");
-		for (int i = 0, n = connections.length; i < n; i++)
-			connections[i].close();
+		for (Connection connection : connections) connection.close();
 		connections = new Connection[0];
 
 		ServerSocketChannel serverChannel = this.serverChannel;
