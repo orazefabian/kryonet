@@ -504,9 +504,7 @@ public class Client extends Connection implements EndPoint {
 	 * @return the first server found, or null if no server responded.
 	 */
 	public InetAddress discoverHost(int udpPort, int timeoutMillis) {
-		DatagramSocket socket = null;
-		try {
-			socket = new DatagramSocket();
+		try (DatagramSocket socket = new DatagramSocket()) {
 			broadcast(udpPort, socket);
 			socket.setSoTimeout(timeoutMillis);
 			DatagramPacket packet = discoveryHandler.onRequestNewDatagramPacket();
@@ -523,7 +521,6 @@ public class Client extends Connection implements EndPoint {
 			if (ERROR) error("kryonet", "Host discovery failed.", ex);
 			return null;
 		} finally {
-			if (socket != null) socket.close();
 			discoveryHandler.onFinally();
 		}
 	}
@@ -536,9 +533,7 @@ public class Client extends Connection implements EndPoint {
 	 */
 	public List<InetAddress> discoverHosts(int udpPort, int timeoutMillis) {
 		List<InetAddress> hosts = new ArrayList<>();
-		DatagramSocket socket = null;
-		try {
-			socket = new DatagramSocket();
+		try (DatagramSocket socket = new DatagramSocket()) {
 			broadcast(udpPort, socket);
 			socket.setSoTimeout(timeoutMillis);
 			while (true) {
@@ -557,7 +552,6 @@ public class Client extends Connection implements EndPoint {
 			if (ERROR) error("kryonet", "Host discovery failed.", ex);
 			return hosts;
 		} finally {
-			if (socket != null) socket.close();
 			discoveryHandler.onFinally();
 		}
 	}
