@@ -369,7 +369,7 @@ public class ObjectSpace {
 		synchronized (instancesLock) {
 			ArrayList<ObjectSpace> temp = new ArrayList<>(Arrays.asList(instances));
 			temp.remove(this);
-			instances = temp.toArray(new ObjectSpace[temp.size()]);
+			instances = temp.toArray(new ObjectSpace[0]);
 		}
 
 		if (TRACE) trace("kryonet", "Closed ObjectSpace.");
@@ -404,7 +404,7 @@ public class ObjectSpace {
 		synchronized (connectionsLock) {
 			ArrayList<Connection> temp = new ArrayList<>(Arrays.asList(connections));
 			temp.remove(connection);
-			connections = temp.toArray(new Connection[temp.size()]);
+			connections = temp.toArray(new Connection[0]);
 		}
 
 		if (TRACE) trace("kryonet", "Removed connection from ObjectSpace: " + connection);

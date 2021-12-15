@@ -466,7 +466,7 @@ public class Server implements EndPoint {
 	void removeConnection(Connection connection) {
 		ArrayList<Connection> temp = new ArrayList<>(Arrays.asList(connections));
 		temp.remove(connection);
-		connections = temp.toArray(new Connection[temp.size()]);
+		connections = temp.toArray(new Connection[0]);
 
 		pendingConnections.remove(connection.id);
 	}
