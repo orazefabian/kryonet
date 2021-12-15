@@ -272,7 +272,7 @@ public class Client extends Connection implements EndPoint {
 				long elapsedTime = System.currentTimeMillis() - startTime;
 				try {
 					if (elapsedTime < 25) Thread.sleep(25 - elapsedTime);
-				} catch (InterruptedException ex) {
+				} catch (InterruptedException ignored) {
 				}
 			}
 		} else {
