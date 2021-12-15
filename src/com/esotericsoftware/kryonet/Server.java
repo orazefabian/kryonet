@@ -44,7 +44,7 @@ public class Server implements EndPoint {
 	private final Serialization serialization;
 	private final int writeBufferSize, objectBufferSize;
 	private final Selector selector;
-	private final IntMap<Connection> pendingConnections = new IntMap();
+	private final IntMap<Connection> pendingConnections = new IntMap<>();
 	private final Object listenerLock = new Object();
 	private final Object updateLock = new Object();
 	Listener[] listeners = {};
@@ -464,7 +464,7 @@ public class Server implements EndPoint {
 	}
 
 	void removeConnection(Connection connection) {
-		ArrayList<Connection> temp = new ArrayList(Arrays.asList(connections));
+		ArrayList<Connection> temp = new ArrayList<>(Arrays.asList(connections));
 		temp.remove(connection);
 		connections = temp.toArray(new Connection[temp.size()]);
 

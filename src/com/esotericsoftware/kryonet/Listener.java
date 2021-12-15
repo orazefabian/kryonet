@@ -68,10 +68,10 @@ public class Listener {
 	 * class uses a HashMap lookup and (cached) reflection, so is not as efficient as writing a series of "instanceof" statements.
 	 */
 	static public class ReflectionListener extends Listener {
-		private final HashMap<Class, Method> classToMethod = new HashMap();
+		private final HashMap<Class<?>, Method> classToMethod = new HashMap<>();
 
 		public void received(Connection connection, Object object) {
-			Class type = object.getClass();
+			Class<?> type = object.getClass();
 			Method method = classToMethod.get(type);
 			if (method == null) {
 				if (classToMethod.containsKey(type)) return; // Only fail on the first attempt to find the method.
@@ -182,7 +182,7 @@ public class Listener {
 	 * the other end of the connection.
 	 */
 	static public class LagListener extends QueuedListener {
-		final LinkedList<Runnable> runnables = new LinkedList();
+		final LinkedList<Runnable> runnables = new LinkedList<>();
 		private final ScheduledExecutorService threadPool;
 		private final int lagMillisMin, lagMillisMax;
 

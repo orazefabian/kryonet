@@ -367,6 +367,7 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 		return h;
 	}
 
+	@SuppressWarnings("rawtypes")
 	public boolean equals(Object obj) {
 		if (obj == this) return true;
 		if (!(obj instanceof ObjectIntMap)) return false;
@@ -428,7 +429,7 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 	 * Returns an iterator for the entries in the map. Remove is supported.
 	 */
 	public Entries<K> entries() {
-		return new Entries(this);
+		return new Entries<>(this);
 	}
 
 	/**
@@ -442,7 +443,7 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 	 * Returns an iterator for the keys in the map. Remove is supported.
 	 */
 	public Keys<K> keys() {
-		return new Keys(this);
+		return new Keys<>(this);
 	}
 
 	static public class Entry<K> {
@@ -606,7 +607,7 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 		 * Returns a new list containing the remaining keys.
 		 */
 		public ArrayList<K> toList() {
-			return toList(new ArrayList(map.size));
+			return toList(new ArrayList<>(map.size));
 		}
 
 		/**
