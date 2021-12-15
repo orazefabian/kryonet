@@ -521,49 +521,50 @@ public class ObjectSpace {
 			Class<?> declaringClass = method.getDeclaringClass();
 			if (declaringClass == RemoteObject.class) {
 				String name = method.getName();
-				if (name.equals("close")) {
-					close();
-					return null;
-				} else if (name.equals("setResponseTimeout")) {
-					timeoutMillis = (Integer) args[0];
-					return null;
-				} else if (name.equals("setNonBlocking")) {
-					nonBlocking = (Boolean) args[0];
-					return null;
-				} else if (name.equals("setTransmitReturnValue")) {
-					transmitReturnValue = (Boolean) args[0];
-					return null;
-				} else if (name.equals("setUDP")) {
-					udp = (Boolean) args[0];
-					return null;
-				} else if (name.equals("setTransmitExceptions")) {
-					transmitExceptions = (Boolean) args[0];
-					return null;
-				} else if (name.equals("setRemoteToString")) {
-					remoteToString = (Boolean) args[0];
-					return null;
-				} else if (name.equals("waitForLastResponse")) {
-					if (lastResponseID == null)
-						throw new IllegalStateException("There is no last response to wait for.");
-					return waitForResponse(lastResponseID);
-				} else if (name.equals("hasLastResponse")) {
-					if (lastResponseID == null) throw new IllegalStateException("There is no last response.");
-					synchronized (this) {
-						return responseTable[lastResponseID] != null;
-					}
-				} else if (name.equals("getLastResponseID")) {
-					if (lastResponseID == null) throw new IllegalStateException("There is no last response ID.");
-					return lastResponseID;
-				} else if (name.equals("waitForResponse")) {
-					if (!transmitReturnValue && !transmitExceptions && nonBlocking)
-						throw new IllegalStateException("This RemoteObject is currently set to ignore all responses.");
-					return waitForResponse((Byte) args[0]);
-				} else if (name.equals("hasResponse")) {
-					synchronized (this) {
-						return responseTable[(Byte) args[0]] != null;
-					}
-				} else if (name.equals("getConnection")) {
-					return connection;
+				switch (name) {
+					case "close":
+						close();
+						return null;
+					case "setResponseTimeout":
+						timeoutMillis = (Integer) args[0];
+						return null;
+					case "setNonBlocking":
+						nonBlocking = (Boolean) args[0];
+						return null;
+					case "setTransmitReturnValue":
+						transmitReturnValue = (Boolean) args[0];
+						return null;
+					case "setUDP":
+						udp = (Boolean) args[0];
+						return null;
+					case "setTransmitExceptions":
+						transmitExceptions = (Boolean) args[0];
+						return null;
+					case "setRemoteToString":
+						remoteToString = (Boolean) args[0];
+						return null;
+					case "waitForLastResponse":
+						if (lastResponseID == null)
+							throw new IllegalStateException("There is no last response to wait for.");
+						return waitForResponse(lastResponseID);
+					case "hasLastResponse":
+						if (lastResponseID == null) throw new IllegalStateException("There is no last response.");
+						synchronized (this) {
+							return responseTable[lastResponseID] != null;
+						}
+					case "getLastResponseID":
+						if (lastResponseID == null) throw new IllegalStateException("There is no last response ID.");
+						return lastResponseID;
+					case "waitForResponse":
+						if (!transmitReturnValue && !transmitExceptions && nonBlocking)
+							throw new IllegalStateException("This RemoteObject is currently set to ignore all responses.");
+						return waitForResponse((Byte) args[0]);
+					case "hasResponse":
+						synchronized (this) {
+							return responseTable[(Byte) args[0]] != null;
+						}
+					case "getConnection":
+						return connection;
 				}
 				// Should never happen, for debugging purposes only
 				throw new KryoNetException("Invocation handler could not find RemoteObject method. Check ObjectSpace.java");
