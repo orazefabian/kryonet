@@ -764,7 +764,7 @@ public class ObjectSpace {
 		MethodAccess methodAccess;
 		int methodAccessIndex = -1;
 
-		public Object invoke(Object target, Object[] args) throws IllegalAccessException, InvocationTargetException {
+		public Object invoke(Object target, Object[] args) throws InvocationTargetException {
 			try {
 				return methodAccess.invoke(target, methodAccessIndex, args);
 			} catch (Exception ex) {
