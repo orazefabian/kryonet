@@ -1,15 +1,15 @@
 /* Copyright (c) 2008, Nathan Sweet
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following
  * conditions are met:
- * 
+ *
  * - Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
  * - Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following
  * disclaimer in the documentation and/or other materials provided with the distribution.
  * - Neither the name of Esoteric Software nor the names of its contributors may be used to endorse or promote products derived
  * from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
  * BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
  * SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
@@ -20,20 +20,27 @@
 package com.esotericsoftware.kryonet.rmi;
 
 import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryonet.Client;
-import com.esotericsoftware.kryonet.Connection;
-import com.esotericsoftware.kryonet.KryoNetTestCase;
-import com.esotericsoftware.kryonet.Listener;
+import com.esotericsoftware.kryonet.*;
 import com.esotericsoftware.kryonet.Listener.ThreadedListener;
-import com.esotericsoftware.kryonet.Server;
 import com.esotericsoftware.kryonet.rmi.ObjectSpace.RemoteObjectSerializer;
 
 import java.io.IOException;
 
 public class RmiSendObjectTest extends KryoNetTestCase {
-	/** In this test the server has two objects in an object space. The client uses the first remote object to get the second remote
-	 * object. */
-	public void testRMI () throws IOException {
+	/**
+	 * Registers the same classes in the same order on both the client and server.
+	 */
+	static public void register(Kryo kryo) {
+		kryo.register(TestObject.class);
+		kryo.register(OtherObject.class, new RemoteObjectSerializer());
+		ObjectSpace.registerClasses(kryo);
+	}
+
+	/**
+	 * In this test the server has two objects in an object space. The client uses the first remote object to get the second remote
+	 * object.
+	 */
+	public void testRMI() throws IOException {
 		Server server = new Server();
 		Kryo serverKryo = server.getKryo();
 		register(serverKryo);
@@ -56,12 +63,12 @@ public class RmiSendObjectTest extends KryoNetTestCase {
 		serverObjectSpace.register(777, serverTestObject.getOtherObject());
 
 		server.addListener(new Listener() {
-			public void connected (final Connection connection) {
+			public void connected(final Connection connection) {
 				// Allow the connection to access objects in the ObjectSpace.
 				serverObjectSpace.addConnection(connection);
 			}
 
-			public void received (Connection connection, Object object) {
+			public void received(Connection connection, Object object) {
 				// The test is complete when the client sends the OtherObject instance.
 				if (object == serverTestObject.getOtherObject()) stopEndPoints();
 			}
@@ -75,7 +82,7 @@ public class RmiSendObjectTest extends KryoNetTestCase {
 
 		// The ThreadedListener means the network thread won't be blocked when waiting for RMI responses.
 		client.addListener(new ThreadedListener(new Listener() {
-			public void connected (final Connection connection) {
+			public void connected(final Connection connection) {
 				TestObject test = ObjectSpace.getRemoteObject(connection, 42, TestObject.class);
 				// Normal remote method call.
 				assertEquals(43.21f, test.other());
@@ -92,37 +99,30 @@ public class RmiSendObjectTest extends KryoNetTestCase {
 		waitForThreads();
 	}
 
-	/** Registers the same classes in the same order on both the client and server. */
-	static public void register (Kryo kryo) {
-		kryo.register(TestObject.class);
-		kryo.register(OtherObject.class, new RemoteObjectSerializer());
-		ObjectSpace.registerClasses(kryo);
+	public interface TestObject {
+		float other();
+
+		OtherObject getOtherObject();
 	}
 
-	static public interface TestObject {
-		public float other ();
-
-		public OtherObject getOtherObject ();
+	public interface OtherObject {
+		float value();
 	}
 
 	static public class TestObjectImpl implements TestObject {
 		public OtherObject otherObject;
 
-		public float other () {
+		public float other() {
 			return 43.21f;
 		}
 
-		public OtherObject getOtherObject () {
+		public OtherObject getOtherObject() {
 			return otherObject;
 		}
 	}
 
-	static public interface OtherObject {
-		public float value ();
-	}
-
 	static public class OtherObjectImpl implements OtherObject {
-		public float value () {
+		public float value() {
 			return 12.34f;
 		}
 	}

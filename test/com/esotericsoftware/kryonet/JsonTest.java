@@ -1,15 +1,15 @@
 /* Copyright (c) 2008, Nathan Sweet
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following
  * conditions are met:
- * 
+ *
  * - Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
  * - Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following
  * disclaimer in the documentation and/or other materials provided with the distribution.
  * - Neither the name of Esoteric Software nor the names of its contributors may be used to endorse or promote products derived
  * from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
  * BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
  * SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
@@ -19,16 +19,13 @@
 
 package com.esotericsoftware.kryonet;
 
-import com.esotericsoftware.jsonbeans.JsonWriter;
-
 import java.io.IOException;
-import java.io.StringWriter;
 import java.util.Arrays;
 
 public class JsonTest extends KryoNetTestCase {
 	String fail;
 
-	public void testJson () throws IOException {
+	public void testJson() throws IOException {
 		fail = null;
 
 		final Data dataTCP = new Data();
@@ -40,14 +37,14 @@ public class JsonTest extends KryoNetTestCase {
 		startEndPoint(server);
 		server.bind(tcpPort, udpPort);
 		server.addListener(new Listener() {
-			public void connected (Connection connection) {
+			public void connected(Connection connection) {
 				connection.sendTCP(dataTCP);
 				connection.sendUDP(dataUDP); // Note UDP ping pong stops if a UDP packet is lost.
 			}
 
-			public void received (Connection connection, Object object) {
+			public void received(Connection connection, Object object) {
 				if (object instanceof Data) {
-					Data data = (Data)object;
+					Data data = (Data) object;
 					if (data.isTCP) {
 						if (!data.equals(dataTCP)) {
 							fail = "TCP data is not equal on server.";
@@ -70,9 +67,9 @@ public class JsonTest extends KryoNetTestCase {
 		final Client client = new Client(16384, 8192, new JsonSerialization());
 		startEndPoint(client);
 		client.addListener(new Listener() {
-			public void received (Connection connection, Object object) {
+			public void received(Connection connection, Object object) {
 				if (object instanceof Data) {
-					Data data = (Data)object;
+					Data data = (Data) object;
 					if (data.isTCP) {
 						if (!data.equals(dataTCP)) {
 							fail = "TCP data is not equal on client.";
@@ -97,7 +94,7 @@ public class JsonTest extends KryoNetTestCase {
 		if (fail != null) fail(fail);
 	}
 
-	private void populateData (Data data, boolean isTCP) {
+	private void populateData(Data data, boolean isTCP) {
 		data.isTCP = isTCP;
 
 		StringBuffer buffer = new StringBuffer();
@@ -105,18 +102,18 @@ public class JsonTest extends KryoNetTestCase {
 			buffer.append('a');
 		data.string = buffer.toString();
 
-		data.strings = new String[] {"abcdefghijklmnopqrstuvwxyz0123456789", "", null, "!@#$", "�����"};
-		data.ints = new int[] {-1234567, 1234567, -1, 0, 1, Integer.MAX_VALUE, Integer.MIN_VALUE};
-		data.shorts = new short[] {-12345, 12345, -1, 0, 1, Short.MAX_VALUE, Short.MIN_VALUE};
-		data.floats = new float[] {0, 1, -1, 123456, -123456, 0.1f, 0.2f, -0.3f, (float)Math.PI, Float.MAX_VALUE, Float.MIN_VALUE};
-		data.bytes = new byte[] {-123, 123, -1, 0, 1, Byte.MAX_VALUE, Byte.MIN_VALUE};
-		data.booleans = new boolean[] {true, false};
-		data.Ints = new Integer[] {-1234567, 1234567, -1, 0, 1, Integer.MAX_VALUE, Integer.MIN_VALUE};
-		data.Shorts = new Short[] {-12345, 12345, -1, 0, 1, Short.MAX_VALUE, Short.MIN_VALUE};
-		data.Floats = new Float[] {0f, 1f, -1f, 123456f, -123456f, 0.1f, 0.2f, -0.3f, (float)Math.PI, Float.MAX_VALUE,
-			Float.MIN_VALUE};
-		data.Bytes = new Byte[] {-123, 123, -1, 0, 1, Byte.MAX_VALUE, Byte.MIN_VALUE};
-		data.Booleans = new Boolean[] {true, false};
+		data.strings = new String[]{"abcdefghijklmnopqrstuvwxyz0123456789", "", null, "!@#$", "�����"};
+		data.ints = new int[]{-1234567, 1234567, -1, 0, 1, Integer.MAX_VALUE, Integer.MIN_VALUE};
+		data.shorts = new short[]{-12345, 12345, -1, 0, 1, Short.MAX_VALUE, Short.MIN_VALUE};
+		data.floats = new float[]{0, 1, -1, 123456, -123456, 0.1f, 0.2f, -0.3f, (float) Math.PI, Float.MAX_VALUE, Float.MIN_VALUE};
+		data.bytes = new byte[]{-123, 123, -1, 0, 1, Byte.MAX_VALUE, Byte.MIN_VALUE};
+		data.booleans = new boolean[]{true, false};
+		data.Ints = new Integer[]{-1234567, 1234567, -1, 0, 1, Integer.MAX_VALUE, Integer.MIN_VALUE};
+		data.Shorts = new Short[]{-12345, 12345, -1, 0, 1, Short.MAX_VALUE, Short.MIN_VALUE};
+		data.Floats = new Float[]{0f, 1f, -1f, 123456f, -123456f, 0.1f, 0.2f, -0.3f, (float) Math.PI, Float.MAX_VALUE,
+				Float.MIN_VALUE};
+		data.Bytes = new Byte[]{-123, 123, -1, 0, 1, Byte.MAX_VALUE, Byte.MIN_VALUE};
+		data.Booleans = new Boolean[]{true, false};
 	}
 
 	static public class Data {
@@ -134,7 +131,7 @@ public class JsonTest extends KryoNetTestCase {
 		public Boolean[] Booleans;
 		public boolean isTCP;
 
-		public int hashCode () {
+		public int hashCode() {
 			final int prime = 31;
 			int result = 1;
 			result = prime * result + Arrays.hashCode(Booleans);
@@ -153,11 +150,11 @@ public class JsonTest extends KryoNetTestCase {
 			return result;
 		}
 
-		public boolean equals (Object obj) {
+		public boolean equals(Object obj) {
 			if (this == obj) return true;
 			if (obj == null) return false;
 			if (getClass() != obj.getClass()) return false;
-			Data other = (Data)obj;
+			Data other = (Data) obj;
 			if (!Arrays.equals(Booleans, other.Booleans)) return false;
 			if (!Arrays.equals(Bytes, other.Bytes)) return false;
 			if (!Arrays.equals(Floats, other.Floats)) return false;
@@ -172,11 +169,10 @@ public class JsonTest extends KryoNetTestCase {
 			if (string == null) {
 				if (other.string != null) return false;
 			} else if (!string.equals(other.string)) return false;
-			if (!Arrays.equals(strings, other.strings)) return false;
-			return true;
+			return Arrays.equals(strings, other.strings);
 		}
 
-		public String toString () {
+		public String toString() {
 			return "Data";
 		}
 	}

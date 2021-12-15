@@ -1,15 +1,15 @@
 /* Copyright (c) 2008, Nathan Sweet
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following
  * conditions are met:
- * 
+ *
  * - Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
  * - Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following
  * disclaimer in the documentation and/or other materials provided with the distribution.
  * - Neither the name of Esoteric Software nor the names of its contributors may be used to endorse or promote products derived
  * from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
  * BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
  * SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
@@ -19,97 +19,98 @@
 
 package com.esotericsoftware.kryonet;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.nio.channels.CancelledKeyException;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.Set;
-
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.util.IntMap;
 import com.esotericsoftware.kryonet.FrameworkMessage.DiscoverHost;
 import com.esotericsoftware.kryonet.FrameworkMessage.RegisterTCP;
 import com.esotericsoftware.kryonet.FrameworkMessage.RegisterUDP;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.channels.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.Set;
+
 import static com.esotericsoftware.minlog.Log.*;
 
-/** Manages TCP and optionally UDP connections from many {@link Client Clients}.
- * @author Nathan Sweet <misc@n4te.com> */
+/**
+ * Manages TCP and optionally UDP connections from many {@link Client Clients}.
+ *
+ * @author Nathan Sweet <misc@n4te.com>
+ */
 public class Server implements EndPoint {
 	private final Serialization serialization;
 	private final int writeBufferSize, objectBufferSize;
 	private final Selector selector;
+	private final IntMap<Connection> pendingConnections = new IntMap();
+	private final Object listenerLock = new Object();
+	private final Object updateLock = new Object();
+	Listener[] listeners = {};
 	private int emptySelects;
 	private ServerSocketChannel serverChannel;
 	private UdpConnection udp;
 	private Connection[] connections = {};
-	private IntMap<Connection> pendingConnections = new IntMap();
-	Listener[] listeners = {};
-	private Object listenerLock = new Object();
-	private int nextConnectionID = 1;
-	private volatile boolean shutdown;
-	private Object updateLock = new Object();
-	private Thread updateThread;
-	private ServerDiscoveryHandler discoveryHandler;
-
-	private Listener dispatchListener = new Listener() {
-		public void connected (Connection connection) {
+	private final Listener dispatchListener = new Listener() {
+		public void connected(Connection connection) {
 			Listener[] listeners = Server.this.listeners;
 			for (int i = 0, n = listeners.length; i < n; i++)
 				listeners[i].connected(connection);
 		}
 
-		public void disconnected (Connection connection) {
+		public void disconnected(Connection connection) {
 			removeConnection(connection);
 			Listener[] listeners = Server.this.listeners;
 			for (int i = 0, n = listeners.length; i < n; i++)
 				listeners[i].disconnected(connection);
 		}
 
-		public void received (Connection connection, Object object) {
+		public void received(Connection connection, Object object) {
 			Listener[] listeners = Server.this.listeners;
 			for (int i = 0, n = listeners.length; i < n; i++)
 				listeners[i].received(connection, object);
 		}
 
-		public void idle (Connection connection) {
+		public void idle(Connection connection) {
 			Listener[] listeners = Server.this.listeners;
 			for (int i = 0, n = listeners.length; i < n; i++)
 				listeners[i].idle(connection);
 		}
 	};
+	private int nextConnectionID = 1;
+	private volatile boolean shutdown;
+	private Thread updateThread;
+	private ServerDiscoveryHandler discoveryHandler;
 
-	/** Creates a Server with a write buffer size of 16384 and an object buffer size of 2048. */
-	public Server () {
+	/**
+	 * Creates a Server with a write buffer size of 16384 and an object buffer size of 2048.
+	 */
+	public Server() {
 		this(16384, 2048);
 	}
 
-	/** @param writeBufferSize One buffer of this size is allocated for each connected client. Objects are serialized to the write
-	 *           buffer where the bytes are queued until they can be written to the TCP socket.
-	 *           <p>
-	 *           Normally the socket is writable and the bytes are written immediately. If the socket cannot be written to and
-	 *           enough serialized objects are queued to overflow the buffer, then the connection will be closed.
-	 *           <p>
-	 *           The write buffer should be sized at least as large as the largest object that will be sent, plus some head room to
-	 *           allow for some serialized objects to be queued in case the buffer is temporarily not writable. The amount of head
-	 *           room needed is dependent upon the size of objects being sent and how often they are sent.
+	/**
+	 * @param writeBufferSize  One buffer of this size is allocated for each connected client. Objects are serialized to the write
+	 *                         buffer where the bytes are queued until they can be written to the TCP socket.
+	 *                         <p>
+	 *                         Normally the socket is writable and the bytes are written immediately. If the socket cannot be written to and
+	 *                         enough serialized objects are queued to overflow the buffer, then the connection will be closed.
+	 *                         <p>
+	 *                         The write buffer should be sized at least as large as the largest object that will be sent, plus some head room to
+	 *                         allow for some serialized objects to be queued in case the buffer is temporarily not writable. The amount of head
+	 *                         room needed is dependent upon the size of objects being sent and how often they are sent.
 	 * @param objectBufferSize One (using only TCP) or three (using both TCP and UDP) buffers of this size are allocated. These
-	 *           buffers are used to hold the bytes for a single object graph until it can be sent over the network or
-	 *           deserialized.
-	 *           <p>
-	 *           The object buffers should be sized at least as large as the largest object that will be sent or received. */
-	public Server (int writeBufferSize, int objectBufferSize) {
+	 *                         buffers are used to hold the bytes for a single object graph until it can be sent over the network or
+	 *                         deserialized.
+	 *                         <p>
+	 *                         The object buffers should be sized at least as large as the largest object that will be sent or received.
+	 */
+	public Server(int writeBufferSize, int objectBufferSize) {
 		this(writeBufferSize, objectBufferSize, new KryoSerialization());
 	}
 
-	public Server (int writeBufferSize, int objectBufferSize, Serialization serialization) {
+	public Server(int writeBufferSize, int objectBufferSize, Serialization serialization) {
 		this.writeBufferSize = writeBufferSize;
 		this.objectBufferSize = objectBufferSize;
 
@@ -124,32 +125,40 @@ public class Server implements EndPoint {
 		}
 	}
 
-	public void setDiscoveryHandler (ServerDiscoveryHandler newDiscoveryHandler) {
+	public void setDiscoveryHandler(ServerDiscoveryHandler newDiscoveryHandler) {
 		discoveryHandler = newDiscoveryHandler;
 	}
 
-	public Serialization getSerialization () {
+	public Serialization getSerialization() {
 		return serialization;
 	}
 
-	public Kryo getKryo () {
-		return serialization instanceof KryoSerialization ? ((KryoSerialization)serialization).getKryo() : null;
+	public Kryo getKryo() {
+		return serialization instanceof KryoSerialization ? ((KryoSerialization) serialization).getKryo() : null;
 	}
 
-	/** Opens a TCP only server.
-	 * @throws IOException if the server could not be opened. */
-	public void bind (int tcpPort) throws IOException {
+	/**
+	 * Opens a TCP only server.
+	 *
+	 * @throws IOException if the server could not be opened.
+	 */
+	public void bind(int tcpPort) throws IOException {
 		bind(new InetSocketAddress(tcpPort), null);
 	}
 
-	/** Opens a TCP and UDP server.
-	 * @throws IOException if the server could not be opened. */
-	public void bind (int tcpPort, int udpPort) throws IOException {
+	/**
+	 * Opens a TCP and UDP server.
+	 *
+	 * @throws IOException if the server could not be opened.
+	 */
+	public void bind(int tcpPort, int udpPort) throws IOException {
 		bind(new InetSocketAddress(tcpPort), new InetSocketAddress(udpPort));
 	}
 
-	/** @param udpPort May be null. */
-	public void bind (InetSocketAddress tcpPort, InetSocketAddress udpPort) throws IOException {
+	/**
+	 * @param udpPort May be null.
+	 */
+	public void bind(InetSocketAddress tcpPort, InetSocketAddress udpPort) throws IOException {
 		close();
 		synchronized (updateLock) {
 			selector.wakeup();
@@ -173,10 +182,13 @@ public class Server implements EndPoint {
 		if (INFO) info("kryonet", "Server opened.");
 	}
 
-	/** Accepts any new connections and reads or writes any pending data for the current connections.
+	/**
+	 * Accepts any new connections and reads or writes any pending data for the current connections.
+	 *
 	 * @param timeout Wait for up to the specified milliseconds for a connection to be ready to process. May be zero to return
-	 *           immediately if there are no connections to process. */
-	public void update (int timeout) throws IOException {
+	 *                immediately if there are no connections to process.
+	 */
+	public void update(int timeout) throws IOException {
 		updateThread = Thread.currentThread();
 		synchronized (updateLock) { // Blocks to avoid a select while the selector is used to bind the server connection.
 		}
@@ -204,11 +216,11 @@ public class Server implements EndPoint {
 			synchronized (keys) {
 				UdpConnection udp = this.udp;
 				outer:
-				for (Iterator<SelectionKey> iter = keys.iterator(); iter.hasNext();) {
+				for (Iterator<SelectionKey> iter = keys.iterator(); iter.hasNext(); ) {
 					keepAlive();
 					SelectionKey selectionKey = iter.next();
 					iter.remove();
-					Connection fromConnection = (Connection)selectionKey.attachment();
+					Connection fromConnection = (Connection) selectionKey.attachment();
 					try {
 						int ops = selectionKey.readyOps();
 
@@ -240,7 +252,8 @@ public class Server implements EndPoint {
 									}
 									fromConnection.close();
 								} catch (KryoNetException ex) {
-									if (ERROR) error("kryonet", "Error reading TCP from connection: " + fromConnection, ex);
+									if (ERROR)
+										error("kryonet", "Error reading TCP from connection: " + fromConnection, ex);
 									fromConnection.close();
 								}
 							}
@@ -300,7 +313,8 @@ public class Server implements EndPoint {
 						} catch (KryoNetException ex) {
 							if (WARN) {
 								if (fromConnection != null) {
-									if (ERROR) error("kryonet", "Error reading UDP from connection: " + fromConnection, ex);
+									if (ERROR)
+										error("kryonet", "Error reading UDP from connection: " + fromConnection, ex);
 								} else
 									warn("kryonet", "Error reading UDP from unregistered address: " + fromAddress, ex);
 							}
@@ -310,7 +324,7 @@ public class Server implements EndPoint {
 						if (object instanceof FrameworkMessage) {
 							if (object instanceof RegisterUDP) {
 								// Store the fromAddress on the connection and reply over TCP with a RegisterUDP to indicate success.
-								int fromConnectionID = ((RegisterUDP)object).connectionID;
+								int fromConnectionID = ((RegisterUDP) object).connectionID;
 								Connection connection = pendingConnections.remove(fromConnectionID);
 								if (connection != null) {
 									if (connection.udpRemoteAddress != null) continue outer;
@@ -318,7 +332,7 @@ public class Server implements EndPoint {
 									addConnection(connection);
 									connection.sendTCP(new RegisterUDP());
 									if (DEBUG) debug("kryonet",
-										"Port " + udp.datagramChannel.socket().getLocalPort() + "/UDP connected to: " + fromAddress);
+											"Port " + udp.datagramChannel.socket().getLocalPort() + "/UDP connected to: " + fromAddress);
 									connection.notifyConnected();
 									continue;
 								}
@@ -329,10 +343,12 @@ public class Server implements EndPoint {
 							if (object instanceof DiscoverHost) {
 								try {
 									boolean responseSent = discoveryHandler.onDiscoverHost(udp.datagramChannel, fromAddress,
-										serialization);
-									if (DEBUG && responseSent) debug("kryonet", "Responded to host discovery from: " + fromAddress);
+											serialization);
+									if (DEBUG && responseSent)
+										debug("kryonet", "Responded to host discovery from: " + fromAddress);
 								} catch (IOException ex) {
-									if (WARN) warn("kryonet", "Error replying to host discovery from: " + fromAddress, ex);
+									if (WARN)
+										warn("kryonet", "Error replying to host discovery from: " + fromAddress, ex);
 								}
 								continue;
 							}
@@ -373,7 +389,7 @@ public class Server implements EndPoint {
 		}
 	}
 
-	private void keepAlive () {
+	private void keepAlive() {
 		long time = System.currentTimeMillis();
 		Connection[] connections = this.connections;
 		for (int i = 0, n = connections.length; i < n; i++) {
@@ -382,7 +398,7 @@ public class Server implements EndPoint {
 		}
 	}
 
-	public void run () {
+	public void run() {
 		if (TRACE) trace("kryonet", "Server thread started.");
 		shutdown = false;
 		while (!shutdown) {
@@ -396,18 +412,18 @@ public class Server implements EndPoint {
 		if (TRACE) trace("kryonet", "Server thread stopped.");
 	}
 
-	public void start () {
+	public void start() {
 		new Thread(this, "Server").start();
 	}
 
-	public void stop () {
+	public void stop() {
 		if (shutdown) return;
 		close();
 		if (TRACE) trace("kryonet", "Server thread stopping.");
 		shutdown = true;
 	}
 
-	private void acceptOperation (SocketChannel socketChannel) {
+	private void acceptOperation(SocketChannel socketChannel) {
 		Connection connection = newConnection();
 		connection.initialize(serialization, writeBufferSize, objectBufferSize);
 		connection.endPoint = this;
@@ -439,20 +455,22 @@ public class Server implements EndPoint {
 		}
 	}
 
-	/** Allows the connections used by the server to be subclassed. This can be useful for storage per connection without an
-	 * additional lookup. */
-	protected Connection newConnection () {
+	/**
+	 * Allows the connections used by the server to be subclassed. This can be useful for storage per connection without an
+	 * additional lookup.
+	 */
+	protected Connection newConnection() {
 		return new Connection();
 	}
 
-	private void addConnection (Connection connection) {
+	private void addConnection(Connection connection) {
 		Connection[] newConnections = new Connection[connections.length + 1];
 		newConnections[0] = connection;
 		System.arraycopy(connections, 0, newConnections, 1, connections.length);
 		connections = newConnections;
 	}
 
-	void removeConnection (Connection connection) {
+	void removeConnection(Connection connection) {
 		ArrayList<Connection> temp = new ArrayList(Arrays.asList(connections));
 		temp.remove(connection);
 		connections = temp.toArray(new Connection[temp.size()]);
@@ -462,7 +480,7 @@ public class Server implements EndPoint {
 
 	// BOZO - Provide mechanism for sending to multiple clients without serializing multiple times.
 
-	public void sendToAllTCP (Object object) {
+	public void sendToAllTCP(Object object) {
 		Connection[] connections = this.connections;
 		for (int i = 0, n = connections.length; i < n; i++) {
 			Connection connection = connections[i];
@@ -470,7 +488,7 @@ public class Server implements EndPoint {
 		}
 	}
 
-	public void sendToAllExceptTCP (int connectionID, Object object) {
+	public void sendToAllExceptTCP(int connectionID, Object object) {
 		Connection[] connections = this.connections;
 		for (int i = 0, n = connections.length; i < n; i++) {
 			Connection connection = connections[i];
@@ -478,7 +496,7 @@ public class Server implements EndPoint {
 		}
 	}
 
-	public void sendToTCP (int connectionID, Object object) {
+	public void sendToTCP(int connectionID, Object object) {
 		Connection[] connections = this.connections;
 		for (int i = 0, n = connections.length; i < n; i++) {
 			Connection connection = connections[i];
@@ -489,7 +507,7 @@ public class Server implements EndPoint {
 		}
 	}
 
-	public void sendToAllUDP (Object object) {
+	public void sendToAllUDP(Object object) {
 		Connection[] connections = this.connections;
 		for (int i = 0, n = connections.length; i < n; i++) {
 			Connection connection = connections[i];
@@ -497,7 +515,7 @@ public class Server implements EndPoint {
 		}
 	}
 
-	public void sendToAllExceptUDP (int connectionID, Object object) {
+	public void sendToAllExceptUDP(int connectionID, Object object) {
 		Connection[] connections = this.connections;
 		for (int i = 0, n = connections.length; i < n; i++) {
 			Connection connection = connections[i];
@@ -505,7 +523,7 @@ public class Server implements EndPoint {
 		}
 	}
 
-	public void sendToUDP (int connectionID, Object object) {
+	public void sendToUDP(int connectionID, Object object) {
 		Connection[] connections = this.connections;
 		for (int i = 0, n = connections.length; i < n; i++) {
 			Connection connection = connections[i];
@@ -516,7 +534,7 @@ public class Server implements EndPoint {
 		}
 	}
 
-	public void addListener (Listener listener) {
+	public void addListener(Listener listener) {
 		if (listener == null) throw new IllegalArgumentException("listener cannot be null.");
 		synchronized (listenerLock) {
 			Listener[] listeners = this.listeners;
@@ -531,7 +549,7 @@ public class Server implements EndPoint {
 		if (TRACE) trace("kryonet", "Server listener added: " + listener.getClass().getName());
 	}
 
-	public void removeListener (Listener listener) {
+	public void removeListener(Listener listener) {
 		if (listener == null) throw new IllegalArgumentException("listener cannot be null.");
 		synchronized (listenerLock) {
 			Listener[] listeners = this.listeners;
@@ -548,8 +566,10 @@ public class Server implements EndPoint {
 		if (TRACE) trace("kryonet", "Server listener removed: " + listener.getClass().getName());
 	}
 
-	/** Closes all open connections and the server port(s). */
-	public void close () {
+	/**
+	 * Closes all open connections and the server port(s).
+	 */
+	public void close() {
 		Connection[] connections = this.connections;
 		if (INFO && connections.length > 0) info("kryonet", "Closing server connections...");
 		for (int i = 0, n = connections.length; i < n; i++)
@@ -583,18 +603,22 @@ public class Server implements EndPoint {
 		}
 	}
 
-	/** Releases the resources used by this server, which may no longer be used. */
-	public void dispose () throws IOException {
+	/**
+	 * Releases the resources used by this server, which may no longer be used.
+	 */
+	public void dispose() throws IOException {
 		close();
 		selector.close();
 	}
 
-	public Thread getUpdateThread () {
+	public Thread getUpdateThread() {
 		return updateThread;
 	}
 
-	/** Returns the current connections. The array returned should not be modified. */
-	public Connection[] getConnections () {
+	/**
+	 * Returns the current connections. The array returned should not be modified.
+	 */
+	public Connection[] getConnections() {
 		return connections;
 	}
 }

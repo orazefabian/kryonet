@@ -1,4 +1,3 @@
-
 package com.esotericsoftware.kryonet.examples.chatrmi;
 
 import java.awt.event.WindowAdapter;
@@ -23,9 +22,9 @@ public class ChatRmiServer {
 	Server server;
 	ArrayList<Player> players = new ArrayList();
 
-	public ChatRmiServer () throws IOException {
+	public ChatRmiServer() throws IOException {
 		server = new Server() {
-			protected Connection newConnection () {
+			protected Connection newConnection() {
 				// Each connection represents a player and has fields
 				// to store state and methods to perform actions.
 				Player player = new Player();
@@ -38,8 +37,8 @@ public class ChatRmiServer {
 		Network.register(server);
 
 		server.addListener(new Listener() {
-			public void disconnected (Connection connection) {
-				Player player = (Player)connection;
+			public void disconnected(Connection connection) {
+				Player player = (Player) connection;
 				players.remove(player);
 				if (player.name != null) {
 					// Announce to everyone that someone (with a registered name) has left.
@@ -57,7 +56,7 @@ public class ChatRmiServer {
 		JFrame frame = new JFrame("Chat RMI Server");
 		frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 		frame.addWindowListener(new WindowAdapter() {
-			public void windowClosed (WindowEvent evt) {
+			public void windowClosed(WindowEvent evt) {
 				server.stop();
 			}
 		});
@@ -67,13 +66,18 @@ public class ChatRmiServer {
 		frame.setVisible(true);
 	}
 
-	void updateNames () {
+	public static void main(String[] args) throws IOException {
+		Log.set(Log.LEVEL_DEBUG);
+		new ChatRmiServer();
+	}
+
+	void updateNames() {
 		// Collect the names of each player.
 		ArrayList namesList = new ArrayList(players.size());
 		for (Player player : players)
 			if (player.name != null) namesList.add(player.name);
 		// Set the names on everyone's chat frame.
-		String[] names = (String[])namesList.toArray(new String[namesList.size()]);
+		String[] names = (String[]) namesList.toArray(new String[namesList.size()]);
 		for (Player player : players)
 			player.frame.setNames(names);
 	}
@@ -82,7 +86,7 @@ public class ChatRmiServer {
 		IChatFrame frame;
 		String name;
 
-		public Player () {
+		public Player() {
 			// Each connection has an ObjectSpace containing the Player.
 			// This allows the other end of the connection to call methods on the Player.
 			new ObjectSpace(this).register(Network.PLAYER, this);
@@ -91,7 +95,7 @@ public class ChatRmiServer {
 			frame = ObjectSpace.getRemoteObject(this, Network.CHAT_FRAME, IChatFrame.class);
 		}
 
-		public void registerName (String name) {
+		public void registerName(String name) {
 			// Do nothing if the player already registered a name.
 			if (this.name != null) return;
 			// Do nothing if the name is invalid.
@@ -108,7 +112,7 @@ public class ChatRmiServer {
 			updateNames();
 		}
 
-		public void sendMessage (String message) {
+		public void sendMessage(String message) {
 			// Do nothing if a player tries to chat before registering a name.
 			if (this.name == null) return;
 			// Do nothing if the chat message is invalid.
@@ -120,10 +124,5 @@ public class ChatRmiServer {
 			for (Player player : players)
 				player.frame.addMessage(message);
 		}
-	}
-
-	public static void main (String[] args) throws IOException {
-		Log.set(Log.LEVEL_DEBUG);
-		new ChatRmiServer();
 	}
 }

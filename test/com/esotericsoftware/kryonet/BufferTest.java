@@ -1,15 +1,15 @@
 /* Copyright (c) 2008, Nathan Sweet
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following
  * conditions are met:
- * 
+ *
  * - Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
  * - Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following
  * disclaimer in the documentation and/or other materials provided with the distribution.
  * - Neither the name of Esoteric Software nor the names of its contributors may be used to endorse or promote products derived
  * from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
  * BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
  * SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
@@ -19,16 +19,16 @@
 
 package com.esotericsoftware.kryonet;
 
+import com.esotericsoftware.kryo.Kryo;
+
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import com.esotericsoftware.kryo.Kryo;
 
 public class BufferTest extends KryoNetTestCase {
 	AtomicInteger received = new AtomicInteger();
 	AtomicInteger receivedBytes = new AtomicInteger();
 
-	public void testManyLargeMessages () throws IOException {
+	public void testManyLargeMessages() throws IOException {
 		final int messageCount = 1024;
 		int objectBufferSize = 10250;
 		int writeBufferSize = 10250 * messageCount;
@@ -39,15 +39,15 @@ public class BufferTest extends KryoNetTestCase {
 		server.bind(tcpPort);
 
 		server.addListener(new Listener() {
-			AtomicInteger received = new AtomicInteger();
-			AtomicInteger receivedBytes = new AtomicInteger();
+			final AtomicInteger received = new AtomicInteger();
+			final AtomicInteger receivedBytes = new AtomicInteger();
 
-			public void received (Connection connection, Object object) {
+			public void received(Connection connection, Object object) {
 				if (object instanceof LargeMessage) {
 					System.out.println("Server sending message: " + received.get());
 					connection.sendTCP(object);
 
-					receivedBytes.addAndGet(((LargeMessage)object).bytes.length);
+					receivedBytes.addAndGet(((LargeMessage) object).bytes.length);
 
 					int count = received.incrementAndGet();
 					System.out.println("Server received " + count + " messages.");
@@ -65,10 +65,10 @@ public class BufferTest extends KryoNetTestCase {
 		client.connect(5000, host, tcpPort);
 
 		client.addListener(new Listener() {
-			AtomicInteger received = new AtomicInteger();
-			AtomicInteger receivedBytes = new AtomicInteger();
+			final AtomicInteger received = new AtomicInteger();
+			final AtomicInteger receivedBytes = new AtomicInteger();
 
-			public void received (Connection connection, Object object) {
+			public void received(Connection connection, Object object) {
 				if (object instanceof LargeMessage) {
 					int count = received.incrementAndGet();
 					System.out.println("Client received " + count + " messages.");
@@ -91,7 +91,7 @@ public class BufferTest extends KryoNetTestCase {
 		waitForThreads(5000);
 	}
 
-	private void register (Kryo kryo) {
+	private void register(Kryo kryo) {
 		kryo.register(byte[].class);
 		kryo.register(LargeMessage.class);
 	}
@@ -99,10 +99,10 @@ public class BufferTest extends KryoNetTestCase {
 	public static class LargeMessage {
 		public byte[] bytes;
 
-		public LargeMessage () {
+		public LargeMessage() {
 		}
 
-		public LargeMessage (byte[] bytes) {
+		public LargeMessage(byte[] bytes) {
 			this.bytes = bytes;
 		}
 	}

@@ -1,4 +1,3 @@
-
 package com.esotericsoftware.kryonet.examples.position;
 
 public class Character {

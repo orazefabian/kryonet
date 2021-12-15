@@ -1,4 +1,3 @@
-
 package com.esotericsoftware.kryonet.examples.position;
 
 import java.io.IOException;
@@ -24,7 +23,7 @@ public class PositionClient {
 	Client client;
 	String name;
 
-	public PositionClient () {
+	public PositionClient() {
 		client = new Client();
 		client.start();
 
@@ -34,10 +33,10 @@ public class PositionClient {
 
 		// ThreadedListener runs the listener methods on a different thread.
 		client.addListener(new ThreadedListener(new Listener() {
-			public void connected (Connection connection) {
+			public void connected(Connection connection) {
 			}
 
-			public void received (Connection connection, Object object) {
+			public void received(Connection connection, Object object) {
 				if (object instanceof RegistrationRequired) {
 					Register register = new Register();
 					register.name = name;
@@ -46,24 +45,24 @@ public class PositionClient {
 				}
 
 				if (object instanceof AddCharacter) {
-					AddCharacter msg = (AddCharacter)object;
+					AddCharacter msg = (AddCharacter) object;
 					ui.addCharacter(msg.character);
 					return;
 				}
 
 				if (object instanceof UpdateCharacter) {
-					ui.updateCharacter((UpdateCharacter)object);
+					ui.updateCharacter((UpdateCharacter) object);
 					return;
 				}
 
 				if (object instanceof RemoveCharacter) {
-					RemoveCharacter msg = (RemoveCharacter)object;
+					RemoveCharacter msg = (RemoveCharacter) object;
 					ui.removeCharacter(msg.id);
 					return;
 				}
 			}
 
-			public void disconnected (Connection connection) {
+			public void disconnected(Connection connection) {
 				System.exit(0);
 			}
 		}));
@@ -94,55 +93,60 @@ public class PositionClient {
 
 			MoveCharacter msg = new MoveCharacter();
 			switch (ch) {
-			case 'w':
-				msg.y = -1;
-				break;
-			case 's':
-				msg.y = 1;
-				break;
-			case 'a':
-				msg.x = -1;
-				break;
-			case 'd':
-				msg.x = 1;
-				break;
-			default:
-				msg = null;
+				case 'w':
+					msg.y = -1;
+					break;
+				case 's':
+					msg.y = 1;
+					break;
+				case 'a':
+					msg.x = -1;
+					break;
+				case 'd':
+					msg.x = 1;
+					break;
+				default:
+					msg = null;
 			}
 			if (msg != null) client.sendTCP(msg);
 		}
 	}
 
+	public static void main(String[] args) {
+		Log.set(Log.LEVEL_DEBUG);
+		new PositionClient();
+	}
+
 	static class UI {
 		HashMap<Integer, Character> characters = new HashMap();
 
-		public String inputHost () {
-			String input = (String)JOptionPane.showInputDialog(null, "Host:", "Connect to server", JOptionPane.QUESTION_MESSAGE,
-				null, null, "localhost");
+		public String inputHost() {
+			String input = (String) JOptionPane.showInputDialog(null, "Host:", "Connect to server", JOptionPane.QUESTION_MESSAGE,
+					null, null, "localhost");
 			if (input == null || input.trim().length() == 0) System.exit(1);
 			return input.trim();
 		}
 
-		public String inputName () {
-			String input = (String)JOptionPane.showInputDialog(null, "Name:", "Connect to server", JOptionPane.QUESTION_MESSAGE,
-				null, null, "Test");
+		public String inputName() {
+			String input = (String) JOptionPane.showInputDialog(null, "Name:", "Connect to server", JOptionPane.QUESTION_MESSAGE,
+					null, null, "Test");
 			if (input == null || input.trim().length() == 0) System.exit(1);
 			return input.trim();
 		}
 
-		public String inputOtherStuff () {
-			String input = (String)JOptionPane.showInputDialog(null, "Other Stuff:", "Create account", JOptionPane.QUESTION_MESSAGE,
-				null, null, "other stuff");
+		public String inputOtherStuff() {
+			String input = (String) JOptionPane.showInputDialog(null, "Other Stuff:", "Create account", JOptionPane.QUESTION_MESSAGE,
+					null, null, "other stuff");
 			if (input == null || input.trim().length() == 0) System.exit(1);
 			return input.trim();
 		}
 
-		public void addCharacter (Character character) {
+		public void addCharacter(Character character) {
 			characters.put(character.id, character);
 			System.out.println(character.name + " added at " + character.x + ", " + character.y);
 		}
 
-		public void updateCharacter (UpdateCharacter msg) {
+		public void updateCharacter(UpdateCharacter msg) {
 			Character character = characters.get(msg.id);
 			if (character == null) return;
 			character.x = msg.x;
@@ -150,14 +154,9 @@ public class PositionClient {
 			System.out.println(character.name + " moved to " + character.x + ", " + character.y);
 		}
 
-		public void removeCharacter (int id) {
+		public void removeCharacter(int id) {
 			Character character = characters.remove(id);
 			if (character != null) System.out.println(character.name + " removed");
 		}
-	}
-
-	public static void main (String[] args) {
-		Log.set(Log.LEVEL_DEBUG);
-		new PositionClient();
 	}
 }

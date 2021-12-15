@@ -1,15 +1,15 @@
 /* Copyright (c) 2008, Nathan Sweet
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following
  * conditions are met:
- * 
+ *
  * - Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
  * - Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following
  * disclaimer in the documentation and/or other materials provided with the distribution.
  * - Neither the name of Esoteric Software nor the names of its contributors may be used to endorse or promote products derived
  * from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
  * BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
  * SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
@@ -19,6 +19,9 @@
 
 package com.esotericsoftware.kryonet;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryonet.FrameworkMessage.Ping;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -26,62 +29,74 @@ import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.channels.SocketChannel;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryonet.FrameworkMessage.Ping;
-
 import static com.esotericsoftware.minlog.Log.*;
 
 // BOZO - Layer to handle handshake state.
 
-/** Represents a TCP and optionally a UDP connection between a {@link Client} and a {@link Server}. If either underlying connection
+/**
+ * Represents a TCP and optionally a UDP connection between a {@link Client} and a {@link Server}. If either underlying connection
  * is closed or errors, both connections are closed.
- * @author Nathan Sweet <misc@n4te.com> */
+ *
+ * @author Nathan Sweet <misc@n4te.com>
+ */
 public class Connection {
+	private final Object listenerLock = new Object();
 	int id = -1;
-	private String name;
 	EndPoint endPoint;
 	TcpConnection tcp;
 	UdpConnection udp;
 	InetSocketAddress udpRemoteAddress;
+	volatile boolean isConnected;
+	volatile KryoNetException lastProtocolError;
+	private String name;
 	private Listener[] listeners = {};
-	private Object listenerLock = new Object();
 	private int lastPingID;
 	private long lastPingSendTime;
 	private int returnTripTime;
-	volatile boolean isConnected;
-	volatile KryoNetException lastProtocolError;
 
-	protected Connection () {
+	protected Connection() {
 	}
 
-	void initialize (Serialization serialization, int writeBufferSize, int objectBufferSize) {
+	void initialize(Serialization serialization, int writeBufferSize, int objectBufferSize) {
 		tcp = new TcpConnection(serialization, writeBufferSize, objectBufferSize);
 	}
 
-	/** Returns the server assigned ID. Will return -1 if this connection has never been connected or the last assigned ID if this
-	 * connection has been disconnected. */
-	public int getID () {
+	/**
+	 * Returns the server assigned ID. Will return -1 if this connection has never been connected or the last assigned ID if this
+	 * connection has been disconnected.
+	 */
+	public int getID() {
 		return id;
 	}
 
-	/** Returns true if this connection is connected to the remote end. Note that a connection can become disconnected at any time. */
-	public boolean isConnected () {
+	/**
+	 * Returns true if this connection is connected to the remote end. Note that a connection can become disconnected at any time.
+	 */
+	public boolean isConnected() {
 		return isConnected;
 	}
-	
-   /**
-    * Returns the last protocol error that occured on the connection.
-    * 
-    * @return The last protocol error or null if none error occured.
-    */
-   public KryoNetException getLastProtocolError() {
-      return lastProtocolError;
-   }
 
-	/** Sends the object over the network using TCP.
+	void setConnected(boolean isConnected) {
+		this.isConnected = isConnected;
+		if (isConnected && name == null) name = "Connection " + id;
+	}
+
+	/**
+	 * Returns the last protocol error that occured on the connection.
+	 *
+	 * @return The last protocol error or null if none error occured.
+	 */
+	public KryoNetException getLastProtocolError() {
+		return lastProtocolError;
+	}
+
+	/**
+	 * Sends the object over the network using TCP.
+	 *
 	 * @return The number of bytes sent.
-	 * @see Kryo#register(Class, com.esotericsoftware.kryo.Serializer) */
-	public int sendTCP (Object object) {
+	 * @see Kryo#register(Class, com.esotericsoftware.kryo.Serializer)
+	 */
+	public int sendTCP(Object object) {
 		if (object == null) throw new IllegalArgumentException("object cannot be null.");
 		try {
 			int length = tcp.send(this, object);
@@ -107,11 +122,14 @@ public class Connection {
 		}
 	}
 
-	/** Sends the object over the network using UDP.
+	/**
+	 * Sends the object over the network using UDP.
+	 *
 	 * @return The number of bytes sent.
+	 * @throws IllegalStateException if this connection was not opened with both TCP and UDP.
 	 * @see Kryo#register(Class, com.esotericsoftware.kryo.Serializer)
-	 * @throws IllegalStateException if this connection was not opened with both TCP and UDP. */
-	public int sendUDP (Object object) {
+	 */
+	public int sendUDP(Object object) {
 		if (object == null) throw new IllegalArgumentException("object cannot be null.");
 		SocketAddress address = udpRemoteAddress;
 		if (address == null && udp != null) address = udp.connectedAddress;
@@ -146,7 +164,7 @@ public class Connection {
 		}
 	}
 
-	public void close () {
+	public void close() {
 		boolean wasConnected = isConnected;
 		isConnected = false;
 		tcp.close();
@@ -158,42 +176,52 @@ public class Connection {
 		setConnected(false);
 	}
 
-	/** Requests the connection to communicate with the remote computer to determine a new value for the
+	/**
+	 * Requests the connection to communicate with the remote computer to determine a new value for the
 	 * {@link #getReturnTripTime() return trip time}. When the connection receives a {@link FrameworkMessage.Ping} object with
-	 * {@link Ping#isReply isReply} set to true, the new return trip time is available. */
-	public void updateReturnTripTime () {
+	 * {@link Ping#isReply isReply} set to true, the new return trip time is available.
+	 */
+	public void updateReturnTripTime() {
 		Ping ping = new Ping();
 		ping.id = lastPingID++;
 		lastPingSendTime = System.currentTimeMillis();
 		sendTCP(ping);
 	}
 
-	/** Returns the last calculated TCP return trip time, or -1 if {@link #updateReturnTripTime()} has never been called or the
-	 * {@link FrameworkMessage.Ping} response has not yet been received. */
-	public int getReturnTripTime () {
+	/**
+	 * Returns the last calculated TCP return trip time, or -1 if {@link #updateReturnTripTime()} has never been called or the
+	 * {@link FrameworkMessage.Ping} response has not yet been received.
+	 */
+	public int getReturnTripTime() {
 		return returnTripTime;
 	}
 
-	/** An empty object will be sent if the TCP connection has not sent an object within the specified milliseconds. Periodically
+	/**
+	 * An empty object will be sent if the TCP connection has not sent an object within the specified milliseconds. Periodically
 	 * sending a keep alive ensures that an abnormal close is detected in a reasonable amount of time (see {@link #setTimeout(int)}
 	 * ). Also, some network hardware will close a TCP connection that ceases to transmit for a period of time (typically 1+
-	 * minutes). Set to zero to disable. Defaults to 8000. */
-	public void setKeepAliveTCP (int keepAliveMillis) {
+	 * minutes). Set to zero to disable. Defaults to 8000.
+	 */
+	public void setKeepAliveTCP(int keepAliveMillis) {
 		tcp.keepAliveMillis = keepAliveMillis;
 	}
 
-	/** If the specified amount of time passes without receiving an object over TCP, the connection is considered closed. When a TCP
+	/**
+	 * If the specified amount of time passes without receiving an object over TCP, the connection is considered closed. When a TCP
 	 * socket is closed normally, the remote end is notified immediately and this timeout is not needed. However, if a socket is
 	 * closed abnormally (eg, power loss), KryoNet uses this timeout to detect the problem. The timeout should be set higher than
 	 * the {@link #setKeepAliveTCP(int) TCP keep alive} for the remote end of the connection. The keep alive ensures that the remote
 	 * end of the connection will be constantly sending objects, and setting the timeout higher than the keep alive allows for
-	 * network latency. Set to zero to disable. Defaults to 12000. */
-	public void setTimeout (int timeoutMillis) {
+	 * network latency. Set to zero to disable. Defaults to 12000.
+	 */
+	public void setTimeout(int timeoutMillis) {
 		tcp.timeoutMillis = timeoutMillis;
 	}
 
-	/** If the listener already exists, it is not added again. */
-	public void addListener (Listener listener) {
+	/**
+	 * If the listener already exists, it is not added again.
+	 */
+	public void addListener(Listener listener) {
 		if (listener == null) throw new IllegalArgumentException("listener cannot be null.");
 		synchronized (listenerLock) {
 			Listener[] listeners = this.listeners;
@@ -208,7 +236,7 @@ public class Connection {
 		if (TRACE) trace("kryonet", "Connection listener added: " + listener.getClass().getName());
 	}
 
-	public void removeListener (Listener listener) {
+	public void removeListener(Listener listener) {
 		if (listener == null) throw new IllegalArgumentException("listener cannot be null.");
 		synchronized (listenerLock) {
 			Listener[] listeners = this.listeners;
@@ -226,14 +254,15 @@ public class Connection {
 		if (TRACE) trace("kryonet", "Connection listener removed: " + listener.getClass().getName());
 	}
 
-	void notifyConnected () {
+	void notifyConnected() {
 		if (INFO) {
 			SocketChannel socketChannel = tcp.socketChannel;
 			if (socketChannel != null) {
 				Socket socket = tcp.socketChannel.socket();
 				if (socket != null) {
-					InetSocketAddress remoteSocketAddress = (InetSocketAddress)socket.getRemoteSocketAddress();
-					if (remoteSocketAddress != null) info("kryonet", this + " connected: " + remoteSocketAddress.getAddress());
+					InetSocketAddress remoteSocketAddress = (InetSocketAddress) socket.getRemoteSocketAddress();
+					if (remoteSocketAddress != null)
+						info("kryonet", this + " connected: " + remoteSocketAddress.getAddress());
 				}
 			}
 		}
@@ -242,13 +271,13 @@ public class Connection {
 			listeners[i].connected(this);
 	}
 
-	void notifyDisconnected () {
+	void notifyDisconnected() {
 		Listener[] listeners = this.listeners;
 		for (int i = 0, n = listeners.length; i < n; i++)
 			listeners[i].disconnected(this);
 	}
 
-	void notifyIdle () {
+	void notifyIdle() {
 		Listener[] listeners = this.listeners;
 		for (int i = 0, n = listeners.length; i < n; i++) {
 			listeners[i].idle(this);
@@ -256,12 +285,12 @@ public class Connection {
 		}
 	}
 
-	void notifyReceived (Object object) {
+	void notifyReceived(Object object) {
 		if (object instanceof Ping) {
-			Ping ping = (Ping)object;
+			Ping ping = (Ping) object;
 			if (ping.isReply) {
 				if (ping.id == lastPingID - 1) {
-					returnTripTime = (int)(System.currentTimeMillis() - lastPingSendTime);
+					returnTripTime = (int) (System.currentTimeMillis() - lastPingSendTime);
 					if (TRACE) trace("kryonet", this + " return trip time: " + returnTripTime);
 				}
 			} else {
@@ -274,67 +303,78 @@ public class Connection {
 			listeners[i].received(this, object);
 	}
 
-	/** Returns the local {@link Client} or {@link Server} to which this connection belongs. */
-	public EndPoint getEndPoint () {
+	/**
+	 * Returns the local {@link Client} or {@link Server} to which this connection belongs.
+	 */
+	public EndPoint getEndPoint() {
 		return endPoint;
 	}
 
-	/** Returns the IP address and port of the remote end of the TCP connection, or null if this connection is not connected. */
-	public InetSocketAddress getRemoteAddressTCP () {
+	/**
+	 * Returns the IP address and port of the remote end of the TCP connection, or null if this connection is not connected.
+	 */
+	public InetSocketAddress getRemoteAddressTCP() {
 		SocketChannel socketChannel = tcp.socketChannel;
 		if (socketChannel != null) {
 			Socket socket = tcp.socketChannel.socket();
 			if (socket != null) {
-				return (InetSocketAddress)socket.getRemoteSocketAddress();
+				return (InetSocketAddress) socket.getRemoteSocketAddress();
 			}
 		}
 		return null;
 	}
 
-	/** Returns the IP address and port of the remote end of the UDP connection, or null if this connection is not connected. */
-	public InetSocketAddress getRemoteAddressUDP () {
+	/**
+	 * Returns the IP address and port of the remote end of the UDP connection, or null if this connection is not connected.
+	 */
+	public InetSocketAddress getRemoteAddressUDP() {
 		InetSocketAddress connectedAddress = udp.connectedAddress;
 		if (connectedAddress != null) return connectedAddress;
 		return udpRemoteAddress;
 	}
 
-	/** Workaround for broken NIO networking on Android 1.6. If true, the underlying NIO buffer is always copied to the beginning of
+	/**
+	 * Workaround for broken NIO networking on Android 1.6. If true, the underlying NIO buffer is always copied to the beginning of
 	 * the buffer before being given to the SocketChannel for sending. The Harmony SocketChannel implementation in Android 1.6
-	 * ignores the buffer position, always copying from the beginning of the buffer. This is fixed in Android 2.0+. */
-	public void setBufferPositionFix (boolean bufferPositionFix) {
+	 * ignores the buffer position, always copying from the beginning of the buffer. This is fixed in Android 2.0+.
+	 */
+	public void setBufferPositionFix(boolean bufferPositionFix) {
 		tcp.bufferPositionFix = bufferPositionFix;
 	}
 
-	/** Sets the friendly name of this connection. This is returned by {@link #toString()} and is useful for providing application
+	/**
+	 * Sets the friendly name of this connection. This is returned by {@link #toString()} and is useful for providing application
 	 * specific identifying information in the logging. May be null for the default name of "Connection X", where X is the
-	 * connection ID. */
-	public void setName (String name) {
+	 * connection ID.
+	 */
+	public void setName(String name) {
 		this.name = name;
 	}
 
-	/** Returns the number of bytes that are waiting to be written to the TCP socket, if any. */
-	public int getTcpWriteBufferSize () {
+	/**
+	 * Returns the number of bytes that are waiting to be written to the TCP socket, if any.
+	 */
+	public int getTcpWriteBufferSize() {
 		return tcp.writeBuffer.position();
 	}
 
-	/** @see #setIdleThreshold(float) */
-	public boolean isIdle () {
-		return tcp.writeBuffer.position() / (float)tcp.writeBuffer.capacity() < tcp.idleThreshold;
+	/**
+	 * @see #setIdleThreshold(float)
+	 */
+	public boolean isIdle() {
+		return tcp.writeBuffer.position() / (float) tcp.writeBuffer.capacity() < tcp.idleThreshold;
 	}
 
-	/** If the percent of the TCP write buffer that is filled is less than the specified threshold,
-	 * {@link Listener#idle(Connection)} will be called for each network thread update. Default is 0.1. */
-	public void setIdleThreshold (float idleThreshold) {
+	/**
+	 * If the percent of the TCP write buffer that is filled is less than the specified threshold,
+	 * {@link Listener#idle(Connection)} will be called for each network thread update. Default is 0.1.
+	 */
+	public void setIdleThreshold(float idleThreshold) {
 		tcp.idleThreshold = idleThreshold;
 	}
 
-	public String toString () {
+	public String toString() {
 		if (name != null) return name;
 		return "Connection " + id;
-	}
-
-	void setConnected (boolean isConnected) {
-		this.isConnected = isConnected;
-		if (isConnected && name == null) name = "Connection " + id;
 	}
 }

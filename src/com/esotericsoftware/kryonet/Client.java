@@ -1,15 +1,15 @@
 /* Copyright (c) 2008, Nathan Sweet
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following
  * conditions are met:
- * 
+ *
  * - Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
  * - Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following
  * disclaimer in the documentation and/or other materials provided with the distribution.
  * - Neither the name of Esoteric Software nor the names of its contributors may be used to endorse or promote products derived
  * from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
  * BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
  * SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
@@ -19,33 +19,27 @@
 
 package com.esotericsoftware.kryonet;
 
-import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
-import java.net.SocketTimeoutException;
-import java.nio.ByteBuffer;
-import java.nio.channels.CancelledKeyException;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.security.AccessControlException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
-
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryonet.FrameworkMessage.DiscoverHost;
 import com.esotericsoftware.kryonet.FrameworkMessage.RegisterTCP;
 import com.esotericsoftware.kryonet.FrameworkMessage.RegisterUDP;
 
+import java.io.IOException;
+import java.net.*;
+import java.nio.ByteBuffer;
+import java.nio.channels.CancelledKeyException;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.security.AccessControlException;
+import java.util.*;
+
 import static com.esotericsoftware.minlog.Log.*;
 
-/** Represents a TCP and optionally a UDP connection to a {@link Server}.
- * @author Nathan Sweet <misc@n4te.com> */
+/**
+ * Represents a TCP and optionally a UDP connection to a {@link Server}.
+ *
+ * @author Nathan Sweet <misc@n4te.com>
+ */
 public class Client extends Connection implements EndPoint {
 	static {
 		try {
@@ -56,13 +50,13 @@ public class Client extends Connection implements EndPoint {
 	}
 
 	private final Serialization serialization;
-	private Selector selector;
+	private final Object updateLock = new Object();
+	private final Selector selector;
+	private final Object tcpRegistrationLock = new Object();
+	private final Object udpRegistrationLock = new Object();
 	private int emptySelects;
 	private volatile boolean tcpRegistered, udpRegistered;
-	private Object tcpRegistrationLock = new Object();
-	private Object udpRegistrationLock = new Object();
 	private volatile boolean shutdown;
-	private final Object updateLock = new Object();
 	private Thread updateThread;
 	private int connectTimeout;
 	private InetAddress connectHost;
@@ -71,30 +65,34 @@ public class Client extends Connection implements EndPoint {
 	private boolean isClosed;
 	private ClientDiscoveryHandler discoveryHandler;
 
-	/** Creates a Client with a write buffer size of 8192 and an object buffer size of 2048. */
-	public Client () {
+	/**
+	 * Creates a Client with a write buffer size of 8192 and an object buffer size of 2048.
+	 */
+	public Client() {
 		this(8192, 2048);
 	}
 
-	/** @param writeBufferSize One buffer of this size is allocated. Objects are serialized to the write buffer where the bytes are
-	 *           queued until they can be written to the TCP socket.
-	 *           <p>
-	 *           Normally the socket is writable and the bytes are written immediately. If the socket cannot be written to and
-	 *           enough serialized objects are queued to overflow the buffer, then the connection will be closed.
-	 *           <p>
-	 *           The write buffer should be sized at least as large as the largest object that will be sent, plus some head room to
-	 *           allow for some serialized objects to be queued in case the buffer is temporarily not writable. The amount of head
-	 *           room needed is dependent upon the size of objects being sent and how often they are sent.
+	/**
+	 * @param writeBufferSize  One buffer of this size is allocated. Objects are serialized to the write buffer where the bytes are
+	 *                         queued until they can be written to the TCP socket.
+	 *                         <p>
+	 *                         Normally the socket is writable and the bytes are written immediately. If the socket cannot be written to and
+	 *                         enough serialized objects are queued to overflow the buffer, then the connection will be closed.
+	 *                         <p>
+	 *                         The write buffer should be sized at least as large as the largest object that will be sent, plus some head room to
+	 *                         allow for some serialized objects to be queued in case the buffer is temporarily not writable. The amount of head
+	 *                         room needed is dependent upon the size of objects being sent and how often they are sent.
 	 * @param objectBufferSize One (using only TCP) or three (using both TCP and UDP) buffers of this size are allocated. These
-	 *           buffers are used to hold the bytes for a single object graph until it can be sent over the network or
-	 *           deserialized.
-	 *           <p>
-	 *           The object buffers should be sized at least as large as the largest object that will be sent or received. */
-	public Client (int writeBufferSize, int objectBufferSize) {
+	 *                         buffers are used to hold the bytes for a single object graph until it can be sent over the network or
+	 *                         deserialized.
+	 *                         <p>
+	 *                         The object buffers should be sized at least as large as the largest object that will be sent or received.
+	 */
+	public Client(int writeBufferSize, int objectBufferSize) {
 		this(writeBufferSize, objectBufferSize, new KryoSerialization());
 	}
 
-	public Client (int writeBufferSize, int objectBufferSize, Serialization serialization) {
+	public Client(int writeBufferSize, int objectBufferSize, Serialization serialization) {
 		super();
 		endPoint = this;
 
@@ -111,43 +109,55 @@ public class Client extends Connection implements EndPoint {
 		}
 	}
 
-	public void setDiscoveryHandler (ClientDiscoveryHandler newDiscoveryHandler) {
+	public void setDiscoveryHandler(ClientDiscoveryHandler newDiscoveryHandler) {
 		discoveryHandler = newDiscoveryHandler;
 	}
 
-	public Serialization getSerialization () {
+	public Serialization getSerialization() {
 		return serialization;
 	}
 
-	public Kryo getKryo () {
-		return serialization instanceof KryoSerialization ? ((KryoSerialization)serialization).getKryo() : null;
+	public Kryo getKryo() {
+		return serialization instanceof KryoSerialization ? ((KryoSerialization) serialization).getKryo() : null;
 	}
 
-	/** Opens a TCP only client.
-	 * @see #connect(int, InetAddress, int, int) */
-	public void connect (int timeout, String host, int tcpPort) throws IOException {
+	/**
+	 * Opens a TCP only client.
+	 *
+	 * @see #connect(int, InetAddress, int, int)
+	 */
+	public void connect(int timeout, String host, int tcpPort) throws IOException {
 		connect(timeout, InetAddress.getByName(host), tcpPort, -1);
 	}
 
-	/** Opens a TCP and UDP client.
-	 * @see #connect(int, InetAddress, int, int) */
-	public void connect (int timeout, String host, int tcpPort, int udpPort) throws IOException {
+	/**
+	 * Opens a TCP and UDP client.
+	 *
+	 * @see #connect(int, InetAddress, int, int)
+	 */
+	public void connect(int timeout, String host, int tcpPort, int udpPort) throws IOException {
 		connect(timeout, InetAddress.getByName(host), tcpPort, udpPort);
 	}
 
-	/** Opens a TCP only client.
-	 * @see #connect(int, InetAddress, int, int) */
-	public void connect (int timeout, InetAddress host, int tcpPort) throws IOException {
+	/**
+	 * Opens a TCP only client.
+	 *
+	 * @see #connect(int, InetAddress, int, int)
+	 */
+	public void connect(int timeout, InetAddress host, int tcpPort) throws IOException {
 		connect(timeout, host, tcpPort, -1);
 	}
 
-	/** Opens a TCP and UDP client. Blocks until the connection is complete or the timeout is reached.
+	/**
+	 * Opens a TCP and UDP client. Blocks until the connection is complete or the timeout is reached.
 	 * <p>
 	 * Because the framework must perform some minimal communication before the connection is considered successful,
 	 * {@link #update(int)} must be called on a separate thread during the connection process.
+	 *
 	 * @throws IllegalStateException if called from the connection's update thread.
-	 * @throws IOException if the client could not be opened or connecting times out. */
-	public void connect (int timeout, InetAddress host, int tcpPort, int udpPort) throws IOException {
+	 * @throws IOException           if the client could not be opened or connecting times out.
+	 */
+	public void connect(int timeout, InetAddress host, int tcpPort, int udpPort) throws IOException {
 		if (host == null) throw new IllegalArgumentException("host cannot be null.");
 		if (Thread.currentThread() == getUpdateThread())
 			throw new IllegalStateException("Cannot connect on the connection's update thread.");
@@ -184,7 +194,7 @@ public class Client extends Connection implements EndPoint {
 				}
 				if (!tcpRegistered) {
 					throw new SocketTimeoutException("Connected, but timed out during TCP registration.\n"
-						+ "Note: Client#update must be called in a separate thread during connect.");
+							+ "Note: Client#update must be called in a separate thread during connect.");
 				}
 			}
 
@@ -217,24 +227,33 @@ public class Client extends Connection implements EndPoint {
 		}
 	}
 
-	/** Calls {@link #connect(int, InetAddress, int, int) connect} with the values last passed to connect.
-	 * @throws IllegalStateException if connect has never been called. */
-	public void reconnect () throws IOException {
+	/**
+	 * Calls {@link #connect(int, InetAddress, int, int) connect} with the values last passed to connect.
+	 *
+	 * @throws IllegalStateException if connect has never been called.
+	 */
+	public void reconnect() throws IOException {
 		reconnect(connectTimeout);
 	}
 
-	/** Calls {@link #connect(int, InetAddress, int, int) connect} with the specified timeout and the other values last passed to
+	/**
+	 * Calls {@link #connect(int, InetAddress, int, int) connect} with the specified timeout and the other values last passed to
 	 * connect.
-	 * @throws IllegalStateException if connect has never been called. */
-	public void reconnect (int timeout) throws IOException {
+	 *
+	 * @throws IllegalStateException if connect has never been called.
+	 */
+	public void reconnect(int timeout) throws IOException {
 		if (connectHost == null) throw new IllegalStateException("This client has never been connected.");
 		connect(timeout, connectHost, connectTcpPort, connectUdpPort);
 	}
 
-	/** Reads or writes any pending data for this client. Multiple threads should not call this method at the same time.
+	/**
+	 * Reads or writes any pending data for this client. Multiple threads should not call this method at the same time.
+	 *
 	 * @param timeout Wait for up to the specified milliseconds for data to be ready to process. May be zero to return immediately
-	 *           if there is no data to process. */
-	public void update (int timeout) throws IOException {
+	 *                if there is no data to process.
+	 */
+	public void update(int timeout) throws IOException {
 		updateThread = Thread.currentThread();
 		synchronized (updateLock) { // Blocks to avoid a select while the selector is used to bind the server connection.
 		}
@@ -261,7 +280,7 @@ public class Client extends Connection implements EndPoint {
 			isClosed = false;
 			Set<SelectionKey> keys = selector.selectedKeys();
 			synchronized (keys) {
-				for (Iterator<SelectionKey> iter = keys.iterator(); iter.hasNext();) {
+				for (Iterator<SelectionKey> iter = keys.iterator(); iter.hasNext(); ) {
 					keepAlive();
 					SelectionKey selectionKey = iter.next();
 					iter.remove();
@@ -274,7 +293,7 @@ public class Client extends Connection implements EndPoint {
 									if (object == null) break;
 									if (!tcpRegistered) {
 										if (object instanceof RegisterTCP) {
-											id = ((RegisterTCP)object).connectionID;
+											id = ((RegisterTCP) object).connectionID;
 											synchronized (tcpRegistrationLock) {
 												tcpRegistered = true;
 												tcpRegistrationLock.notifyAll();
@@ -293,7 +312,7 @@ public class Client extends Connection implements EndPoint {
 												if (TRACE) trace("kryonet", this + " received UDP: RegisterUDP");
 												if (DEBUG) {
 													debug("kryonet", "Port " + udp.datagramChannel.socket().getLocalPort()
-														+ "/UDP connected to: " + udp.connectedAddress);
+															+ "/UDP connected to: " + udp.connectedAddress);
 												}
 												setConnected(true);
 											}
@@ -341,14 +360,14 @@ public class Client extends Connection implements EndPoint {
 		}
 	}
 
-	void keepAlive () {
+	void keepAlive() {
 		if (!isConnected) return;
 		long time = System.currentTimeMillis();
 		if (tcp.needsKeepAlive(time)) sendTCP(FrameworkMessage.keepAlive);
 		if (udp != null && udpRegistered && udp.needsKeepAlive(time)) sendUDP(FrameworkMessage.keepAlive);
 	}
 
-	public void run () {
+	public void run() {
 		if (TRACE) trace("kryonet", "Client thread started.");
 		shutdown = false;
 		while (!shutdown) {
@@ -382,7 +401,7 @@ public class Client extends Connection implements EndPoint {
 		if (TRACE) trace("kryonet", "Client thread stopped.");
 	}
 
-	public void start () {
+	public void start() {
 		// Try to let any previous update thread stop.
 		if (updateThread != null) {
 			shutdown = true;
@@ -396,7 +415,7 @@ public class Client extends Connection implements EndPoint {
 		updateThread.start();
 	}
 
-	public void stop () {
+	public void stop() {
 		if (shutdown) return;
 		close();
 		if (TRACE) trace("kryonet", "Client thread stopping.");
@@ -404,7 +423,7 @@ public class Client extends Connection implements EndPoint {
 		selector.wakeup();
 	}
 
-	public void close () {
+	public void close() {
 		super.close();
 		synchronized (updateLock) { // Blocks to avoid a select while the selector is used to bind the server connection.
 		}
@@ -419,35 +438,39 @@ public class Client extends Connection implements EndPoint {
 		}
 	}
 
-	/** Releases the resources used by this client, which may no longer be used. */
-	public void dispose () throws IOException {
+	/**
+	 * Releases the resources used by this client, which may no longer be used.
+	 */
+	public void dispose() throws IOException {
 		close();
 		selector.close();
 	}
 
-	public void addListener (Listener listener) {
+	public void addListener(Listener listener) {
 		super.addListener(listener);
 		if (TRACE) trace("kryonet", "Client listener added.");
 	}
 
-	public void removeListener (Listener listener) {
+	public void removeListener(Listener listener) {
 		super.removeListener(listener);
 		if (TRACE) trace("kryonet", "Client listener removed.");
 	}
 
-	/** An empty object will be sent if the UDP connection is inactive more than the specified milliseconds. Network hardware may
+	/**
+	 * An empty object will be sent if the UDP connection is inactive more than the specified milliseconds. Network hardware may
 	 * keep a translation table of inside to outside IP addresses and a UDP keep alive keeps this table entry from expiring. Set to
-	 * zero to disable. Defaults to 19000. */
-	public void setKeepAliveUDP (int keepAliveMillis) {
+	 * zero to disable. Defaults to 19000.
+	 */
+	public void setKeepAliveUDP(int keepAliveMillis) {
 		if (udp == null) throw new IllegalStateException("Not connected via UDP.");
 		udp.keepAliveMillis = keepAliveMillis;
 	}
 
-	public Thread getUpdateThread () {
+	public Thread getUpdateThread() {
 		return updateThread;
 	}
 
-	private void broadcast (int udpPort, DatagramSocket socket) throws IOException {
+	private void broadcast(int udpPort, DatagramSocket socket) throws IOException {
 		ByteBuffer dataBuffer = ByteBuffer.allocate(64);
 		serialization.write(null, dataBuffer, new DiscoverHost());
 		dataBuffer.flip();
@@ -472,12 +495,15 @@ public class Client extends Connection implements EndPoint {
 		if (DEBUG) debug("kryonet", "Broadcasted host discovery on port: " + udpPort);
 	}
 
-	/** Broadcasts a UDP message on the LAN to discover any running servers. The address of the first server to respond is
+	/**
+	 * Broadcasts a UDP message on the LAN to discover any running servers. The address of the first server to respond is
 	 * returned.
-	 * @param udpPort The UDP port of the server.
+	 *
+	 * @param udpPort       The UDP port of the server.
 	 * @param timeoutMillis The number of milliseconds to wait for a response.
-	 * @return the first server found, or null if no server responded. */
-	public InetAddress discoverHost (int udpPort, int timeoutMillis) {
+	 * @return the first server found, or null if no server responded.
+	 */
+	public InetAddress discoverHost(int udpPort, int timeoutMillis) {
 		DatagramSocket socket = null;
 		try {
 			socket = new DatagramSocket();
@@ -502,10 +528,13 @@ public class Client extends Connection implements EndPoint {
 		}
 	}
 
-	/** Broadcasts a UDP message on the LAN to discover any running servers.
-	 * @param udpPort The UDP port of the server.
-	 * @param timeoutMillis The number of milliseconds to wait for a response. */
-	public List<InetAddress> discoverHosts (int udpPort, int timeoutMillis) {
+	/**
+	 * Broadcasts a UDP message on the LAN to discover any running servers.
+	 *
+	 * @param udpPort       The UDP port of the server.
+	 * @param timeoutMillis The number of milliseconds to wait for a response.
+	 */
+	public List<InetAddress> discoverHosts(int udpPort, int timeoutMillis) {
 		List<InetAddress> hosts = new ArrayList<InetAddress>();
 		DatagramSocket socket = null;
 		try {
