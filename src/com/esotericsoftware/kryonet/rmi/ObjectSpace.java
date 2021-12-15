@@ -173,7 +173,7 @@ public class ObjectSpace {
 			if (method.isSynthetic()) continue;
 			methods.add(method);
 		}
-		Collections.sort(methods, (o1, o2) -> {
+		methods.sort((o1, o2) -> {
 			// Methods are sorted so they can be represented as an index.
 			int diff = o1.getName().compareTo(o2.getName());
 			if (diff != 0) return diff;
