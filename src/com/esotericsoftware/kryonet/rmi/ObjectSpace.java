@@ -117,11 +117,7 @@ public class ObjectSpace {
 			if (executor == null)
 				invoke(connection, target, invokeMethod);
 			else {
-				executor.execute(new Runnable() {
-					public void run() {
-						invoke(connection, target, invokeMethod);
-					}
-				});
+				executor.execute(() -> invoke(connection, target, invokeMethod));
 			}
 		}
 
@@ -177,21 +173,19 @@ public class ObjectSpace {
 			if (method.isSynthetic()) continue;
 			methods.add(method);
 		}
-		Collections.sort(methods, new Comparator<>() {
-			public int compare(Method o1, Method o2) {
-				// Methods are sorted so they can be represented as an index.
-				int diff = o1.getName().compareTo(o2.getName());
+		Collections.sort(methods, (o1, o2) -> {
+			// Methods are sorted so they can be represented as an index.
+			int diff = o1.getName().compareTo(o2.getName());
+			if (diff != 0) return diff;
+			Class<?>[] argTypes1 = o1.getParameterTypes();
+			Class<?>[] argTypes2 = o2.getParameterTypes();
+			if (argTypes1.length > argTypes2.length) return 1;
+			if (argTypes1.length < argTypes2.length) return -1;
+			for (int i = 0; i < argTypes1.length; i++) {
+				diff = argTypes1[i].getName().compareTo(argTypes2[i].getName());
 				if (diff != 0) return diff;
-				Class<?>[] argTypes1 = o1.getParameterTypes();
-				Class<?>[] argTypes2 = o2.getParameterTypes();
-				if (argTypes1.length > argTypes2.length) return 1;
-				if (argTypes1.length < argTypes2.length) return -1;
-				for (int i = 0; i < argTypes1.length; i++) {
-					diff = argTypes1[i].getName().compareTo(argTypes2[i].getName());
-					if (diff != 0) return diff;
-				}
-				throw new RuntimeException("Two methods with same signature!"); // Impossible.
 			}
+			throw new RuntimeException("Two methods with same signature!"); // Impossible.
 		});
 
 		Object methodAccess = null;

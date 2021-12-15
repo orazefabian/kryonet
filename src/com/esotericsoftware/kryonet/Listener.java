@@ -115,35 +115,19 @@ public class Listener {
 		}
 
 		public void connected(final Connection connection) {
-			queue(new Runnable() {
-				public void run() {
-					listener.connected(connection);
-				}
-			});
+			queue(() -> listener.connected(connection));
 		}
 
 		public void disconnected(final Connection connection) {
-			queue(new Runnable() {
-				public void run() {
-					listener.disconnected(connection);
-				}
-			});
+			queue(() -> listener.disconnected(connection));
 		}
 
 		public void received(final Connection connection, final Object object) {
-			queue(new Runnable() {
-				public void run() {
-					listener.received(connection, object);
-				}
-			});
+			queue(() -> listener.received(connection, object));
 		}
 
 		public void idle(final Connection connection) {
-			queue(new Runnable() {
-				public void run() {
-					listener.idle(connection);
-				}
-			});
+			queue(() -> listener.idle(connection));
 		}
 
 		abstract protected void queue(Runnable runnable);
@@ -198,14 +182,12 @@ public class Listener {
 				runnables.addFirst(runnable);
 			}
 			int lag = lagMillisMin + (int) (Math.random() * (lagMillisMax - lagMillisMin));
-			threadPool.schedule(new Runnable() {
-				public void run() {
-					Runnable runnable;
-					synchronized (runnables) {
-						runnable = runnables.removeLast();
-					}
-					runnable.run();
+			threadPool.schedule(() -> {
+				Runnable runnable1;
+				synchronized (runnables) {
+					runnable1 = runnables.removeLast();
 				}
+				runnable1.run();
 			}, lag, TimeUnit.MILLISECONDS);
 		}
 	}
