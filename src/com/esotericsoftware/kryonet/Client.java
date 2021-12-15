@@ -535,7 +535,7 @@ public class Client extends Connection implements EndPoint {
 	 * @param timeoutMillis The number of milliseconds to wait for a response.
 	 */
 	public List<InetAddress> discoverHosts(int udpPort, int timeoutMillis) {
-		List<InetAddress> hosts = new ArrayList<InetAddress>();
+		List<InetAddress> hosts = new ArrayList<>();
 		DatagramSocket socket = null;
 		try {
 			socket = new DatagramSocket();

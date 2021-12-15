@@ -177,7 +177,7 @@ public class ObjectSpace {
 			if (method.isSynthetic()) continue;
 			methods.add(method);
 		}
-		Collections.sort(methods, new Comparator<Method>() {
+		Collections.sort(methods, new Comparator<>() {
 			public int compare(Method o1, Method o2) {
 				// Methods are sorted so they can be represented as an index.
 				int diff = o1.getName().compareTo(o2.getName());
@@ -278,7 +278,7 @@ public class ObjectSpace {
 		kryo.register(Object[].class);
 		kryo.register(InvokeMethod.class);
 
-		FieldSerializer<InvokeMethodResult> resultSerializer = new FieldSerializer<InvokeMethodResult>(kryo,
+		FieldSerializer<InvokeMethodResult> resultSerializer = new FieldSerializer<>(kryo,
 				InvokeMethodResult.class) {
 			public void write(Kryo kryo, Output output, InvokeMethodResult result) {
 				super.write(kryo, output, result);

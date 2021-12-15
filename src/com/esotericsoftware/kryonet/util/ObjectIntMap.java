@@ -507,7 +507,7 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 	}
 
 	static public class Entries<K> extends MapIterator<K> implements Iterable<Entry<K>>, Iterator<Entry<K>> {
-		Entry<K> entry = new Entry<K>();
+		Entry<K> entry = new Entry<>();
 
 		public Entries(ObjectIntMap<K> map) {
 			super(map);
