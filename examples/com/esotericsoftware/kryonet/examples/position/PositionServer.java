@@ -1,4 +1,3 @@
-
 package com.esotericsoftware.kryonet.examples.position;
 
 import java.io.DataInputStream;
@@ -25,9 +24,9 @@ public class PositionServer {
 	Server server;
 	HashSet<Character> loggedIn = new HashSet();
 
-	public PositionServer () throws IOException {
+	public PositionServer() throws IOException {
 		server = new Server() {
-			protected Connection newConnection () {
+			protected Connection newConnection() {
 				// By providing our own connection implementation, we can store per
 				// connection state without a connection ID to state look up.
 				return new CharacterConnection();
@@ -39,9 +38,9 @@ public class PositionServer {
 		Network.register(server);
 
 		server.addListener(new Listener() {
-			public void received (Connection c, Object object) {
+			public void received(Connection c, Object object) {
 				// We know all connections for this server are actually CharacterConnections.
-				CharacterConnection connection = (CharacterConnection)c;
+				CharacterConnection connection = (CharacterConnection) c;
 				Character character = connection.character;
 
 				if (object instanceof Login) {
@@ -49,7 +48,7 @@ public class PositionServer {
 					if (character != null) return;
 
 					// Reject if the name is invalid.
-					String name = ((Login)object).name;
+					String name = ((Login) object).name;
 					if (!isValid(name)) {
 						c.close();
 						return;
@@ -79,7 +78,7 @@ public class PositionServer {
 					// Ignore if already logged in.
 					if (character != null) return;
 
-					Register register = (Register)object;
+					Register register = (Register) object;
 
 					// Reject if the login is invalid.
 					if (!isValid(register.name)) {
@@ -115,7 +114,7 @@ public class PositionServer {
 					// Ignore if not logged in.
 					if (character == null) return;
 
-					MoveCharacter msg = (MoveCharacter)object;
+					MoveCharacter msg = (MoveCharacter) object;
 
 					// Ignore if invalid move.
 					if (Math.abs(msg.x) != 1 && Math.abs(msg.y) != 1) return;
@@ -136,15 +135,15 @@ public class PositionServer {
 				}
 			}
 
-			private boolean isValid (String value) {
+			private boolean isValid(String value) {
 				if (value == null) return false;
 				value = value.trim();
 				if (value.length() == 0) return false;
 				return true;
 			}
 
-			public void disconnected (Connection c) {
-				CharacterConnection connection = (CharacterConnection)c;
+			public void disconnected(Connection c) {
+				CharacterConnection connection = (CharacterConnection) c;
 				if (connection.character != null) {
 					loggedIn.remove(connection.character);
 
@@ -158,7 +157,12 @@ public class PositionServer {
 		server.start();
 	}
 
-	void loggedIn (CharacterConnection c, Character character) {
+	public static void main(String[] args) throws IOException {
+		Log.set(Log.LEVEL_DEBUG);
+		new PositionServer();
+	}
+
+	void loggedIn(CharacterConnection c, Character character) {
 		c.character = character;
 
 		// Add existing characters to new logged in connection.
@@ -176,7 +180,7 @@ public class PositionServer {
 		server.sendToAllTCP(addCharacter);
 	}
 
-	boolean saveCharacter (Character character) {
+	boolean saveCharacter(Character character) {
 		File file = new File("characters", character.name.toLowerCase());
 		file.getParentFile().mkdirs();
 
@@ -205,7 +209,7 @@ public class PositionServer {
 		}
 	}
 
-	Character loadCharacter (String name) {
+	Character loadCharacter(String name) {
 		File file = new File("characters", name.toLowerCase());
 		if (!file.exists()) return null;
 		DataInputStream input = null;
@@ -233,10 +237,5 @@ public class PositionServer {
 	// This holds per connection state.
 	static class CharacterConnection extends Connection {
 		public Character character;
-	}
-
-	public static void main (String[] args) throws IOException {
-		Log.set(Log.LEVEL_DEBUG);
-		new PositionServer();
 	}
 }

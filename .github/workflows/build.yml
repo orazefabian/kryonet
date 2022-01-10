@@ -4,7 +4,7 @@ on:
     branches:
       - master
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [ opened, synchronize, reopened ]
 jobs:
   build:
     name: Build
@@ -29,7 +29,7 @@ jobs:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
-      - name: test install 
+      - name: test install
         run: sudo apt install gringo -y
       - name: install zsh and set as default
         run: sudo apt install zsh -y && sudo chsh -s $(which zsh)

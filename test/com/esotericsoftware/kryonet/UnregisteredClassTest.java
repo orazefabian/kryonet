@@ -1,15 +1,15 @@
 /* Copyright (c) 2008, Nathan Sweet
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following
  * conditions are met:
- * 
+ *
  * - Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
  * - Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following
  * disclaimer in the documentation and/or other materials provided with the distribution.
  * - Neither the name of Esoteric Software nor the names of its contributors may be used to endorse or promote products derived
  * from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
  * BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
  * SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
@@ -19,17 +19,12 @@
 
 package com.esotericsoftware.kryonet;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
-import com.esotericsoftware.minlog.Log;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class UnregisteredClassTest extends KryoNetTestCase {
-	public void testUnregisteredClasses () throws IOException {
+	public void testUnregisteredClasses() throws IOException {
 		final Data dataTCP = new Data();
 		populateData(dataTCP, true);
 		final Data dataUDP = new Data();
@@ -43,14 +38,14 @@ public class UnregisteredClassTest extends KryoNetTestCase {
 		startEndPoint(server);
 		server.bind(tcpPort, udpPort);
 		server.addListener(new Listener() {
-			public void connected (Connection connection) {
+			public void connected(Connection connection) {
 				connection.sendTCP(dataTCP);
 				connection.sendUDP(dataUDP);
 			}
 
-			public void received (Connection connection, Object object) {
+			public void received(Connection connection, Object object) {
 				if (object instanceof Data) {
-					Data data = (Data)object;
+					Data data = (Data) object;
 					if (data.isTCP) {
 						if (!data.equals(dataTCP)) fail();
 						receivedTCP.incrementAndGet();
@@ -68,9 +63,9 @@ public class UnregisteredClassTest extends KryoNetTestCase {
 		client.getKryo().setRegistrationRequired(false);
 		startEndPoint(client);
 		client.addListener(new Listener() {
-			public void received (Connection connection, Object object) {
+			public void received(Connection connection, Object object) {
 				if (object instanceof Data) {
-					Data data = (Data)object;
+					Data data = (Data) object;
 					if (data.isTCP) {
 						if (!data.equals(dataTCP)) fail();
 						receivedTCP.incrementAndGet();
@@ -92,7 +87,7 @@ public class UnregisteredClassTest extends KryoNetTestCase {
 		assertEquals(2, receivedUDP.intValue());
 	}
 
-	private void populateData (Data data, boolean isTCP) {
+	private void populateData(Data data, boolean isTCP) {
 		data.isTCP = isTCP;
 
 		StringBuffer buffer = new StringBuffer();
@@ -100,26 +95,26 @@ public class UnregisteredClassTest extends KryoNetTestCase {
 			buffer.append('a');
 		data.string = buffer.toString();
 
-		data.strings = new String[] {"abcdefghijklmnopqrstuvwxyz0123456789", "", null, "!@#$", "�����"};
-		data.ints = new int[] {-1234567, 1234567, -1, 0, 1, Integer.MAX_VALUE, Integer.MIN_VALUE};
-		data.shorts = new short[] {-12345, 12345, -1, 0, 1, Short.MAX_VALUE, Short.MIN_VALUE};
-		data.floats = new float[] {0, -0, 1, -1, 123456, -123456, 0.1f, 0.2f, -0.3f, (float)Math.PI, Float.MAX_VALUE,
-			Float.MIN_VALUE};
-		data.doubles = new double[] {0, -0, 1, -1, 123456, -123456, 0.1d, 0.2d, -0.3d, Math.PI, Double.MAX_VALUE, Double.MIN_VALUE};
-		data.longs = new long[] {0, -0, 1, -1, 123456, -123456, 99999999999l, -99999999999l, Long.MAX_VALUE, Long.MIN_VALUE};
-		data.bytes = new byte[] {-123, 123, -1, 0, 1, Byte.MAX_VALUE, Byte.MIN_VALUE};
-		data.chars = new char[] {32345, 12345, 0, 1, 63, Character.MAX_VALUE, Character.MIN_VALUE};
-		data.booleans = new boolean[] {true, false};
-		data.Ints = new Integer[] {-1234567, 1234567, -1, 0, 1, Integer.MAX_VALUE, Integer.MIN_VALUE};
-		data.Shorts = new Short[] {-12345, 12345, -1, 0, 1, Short.MAX_VALUE, Short.MIN_VALUE};
-		data.Floats = new Float[] {0f, -0f, 1f, -1f, 123456f, -123456f, 0.1f, 0.2f, -0.3f, (float)Math.PI, Float.MAX_VALUE,
-			Float.MIN_VALUE};
-		data.Doubles = new Double[] {0d, -0d, 1d, -1d, 123456d, -123456d, 0.1d, 0.2d, -0.3d, Math.PI, Double.MAX_VALUE,
-			Double.MIN_VALUE};
-		data.Longs = new Long[] {0l, -0l, 1l, -1l, 123456l, -123456l, 99999999999l, -99999999999l, Long.MAX_VALUE, Long.MIN_VALUE};
-		data.Bytes = new Byte[] {-123, 123, -1, 0, 1, Byte.MAX_VALUE, Byte.MIN_VALUE};
-		data.Chars = new Character[] {32345, 12345, 0, 1, 63, Character.MAX_VALUE, Character.MIN_VALUE};
-		data.Booleans = new Boolean[] {true, false};
+		data.strings = new String[]{"abcdefghijklmnopqrstuvwxyz0123456789", "", null, "!@#$", "�����"};
+		data.ints = new int[]{-1234567, 1234567, -1, 0, 1, Integer.MAX_VALUE, Integer.MIN_VALUE};
+		data.shorts = new short[]{-12345, 12345, -1, 0, 1, Short.MAX_VALUE, Short.MIN_VALUE};
+		data.floats = new float[]{0, -0, 1, -1, 123456, -123456, 0.1f, 0.2f, -0.3f, (float) Math.PI, Float.MAX_VALUE,
+				Float.MIN_VALUE};
+		data.doubles = new double[]{0, -0, 1, -1, 123456, -123456, 0.1d, 0.2d, -0.3d, Math.PI, Double.MAX_VALUE, Double.MIN_VALUE};
+		data.longs = new long[]{0, -0, 1, -1, 123456, -123456, 99999999999l, -99999999999l, Long.MAX_VALUE, Long.MIN_VALUE};
+		data.bytes = new byte[]{-123, 123, -1, 0, 1, Byte.MAX_VALUE, Byte.MIN_VALUE};
+		data.chars = new char[]{32345, 12345, 0, 1, 63, Character.MAX_VALUE, Character.MIN_VALUE};
+		data.booleans = new boolean[]{true, false};
+		data.Ints = new Integer[]{-1234567, 1234567, -1, 0, 1, Integer.MAX_VALUE, Integer.MIN_VALUE};
+		data.Shorts = new Short[]{-12345, 12345, -1, 0, 1, Short.MAX_VALUE, Short.MIN_VALUE};
+		data.Floats = new Float[]{0f, -0f, 1f, -1f, 123456f, -123456f, 0.1f, 0.2f, -0.3f, (float) Math.PI, Float.MAX_VALUE,
+				Float.MIN_VALUE};
+		data.Doubles = new Double[]{0d, -0d, 1d, -1d, 123456d, -123456d, 0.1d, 0.2d, -0.3d, Math.PI, Double.MAX_VALUE,
+				Double.MIN_VALUE};
+		data.Longs = new Long[]{0l, -0l, 1l, -1l, 123456l, -123456l, 99999999999l, -99999999999l, Long.MAX_VALUE, Long.MIN_VALUE};
+		data.Bytes = new Byte[]{-123, 123, -1, 0, 1, Byte.MAX_VALUE, Byte.MIN_VALUE};
+		data.Chars = new Character[]{32345, 12345, 0, 1, 63, Character.MAX_VALUE, Character.MIN_VALUE};
+		data.Booleans = new Boolean[]{true, false};
 	}
 
 	static public class Data {
@@ -143,7 +138,7 @@ public class UnregisteredClassTest extends KryoNetTestCase {
 		public Boolean[] Booleans;
 		public boolean isTCP;
 
-		public int hashCode () {
+		public int hashCode() {
 			final int prime = 31;
 			int result = 1;
 			result = prime * result + Arrays.hashCode(Booleans);
@@ -168,11 +163,11 @@ public class UnregisteredClassTest extends KryoNetTestCase {
 			return result;
 		}
 
-		public boolean equals (Object obj) {
+		public boolean equals(Object obj) {
 			if (this == obj) return true;
 			if (obj == null) return false;
 			if (getClass() != obj.getClass()) return false;
-			Data other = (Data)obj;
+			Data other = (Data) obj;
 			if (!Arrays.equals(Booleans, other.Booleans)) return false;
 			if (!Arrays.equals(Bytes, other.Bytes)) return false;
 			if (!Arrays.equals(Chars, other.Chars)) return false;
@@ -193,11 +188,10 @@ public class UnregisteredClassTest extends KryoNetTestCase {
 			if (string == null) {
 				if (other.string != null) return false;
 			} else if (!string.equals(other.string)) return false;
-			if (!Arrays.equals(strings, other.strings)) return false;
-			return true;
+			return Arrays.equals(strings, other.strings);
 		}
 
-		public String toString () {
+		public String toString() {
 			return "Data";
 		}
 	}

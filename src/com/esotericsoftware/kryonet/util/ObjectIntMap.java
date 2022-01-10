@@ -1,15 +1,15 @@
 /* Copyright (c) 2008, Nathan Sweet
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following
  * conditions are met:
- * 
+ *
  * - Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
  * - Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following
  * disclaimer in the documentation and/or other materials provided with the distribution.
  * - Neither the name of Esoteric Software nor the names of its contributors may be used to endorse or promote products derived
  * from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
  * BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
  * SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
@@ -19,16 +19,13 @@
 
 package com.esotericsoftware.kryonet.util;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
-import java.util.NoSuchElementException;
-
 import com.esotericsoftware.kryo.KryoException;
 import com.esotericsoftware.kryo.util.IntArray;
 
-/** An unordered map where the keys are objects and the values are unboxed ints. Null keys are not allowed. No allocation is done
+import java.util.*;
+
+/**
+ * An unordered map where the keys are objects and the values are unboxed ints. Null keys are not allowed. No allocation is done
  * except when growing the table size.
  * <p>
  * This class performs fast contains and remove (typically O(1), worst case O(n) but that is rare in practice). Add may be
@@ -42,69 +39,100 @@ import com.esotericsoftware.kryo.util.IntArray;
  * hashing, instead of the more common power-of-two mask, to better distribute poor hashCodes (see <a href=
  * "https://probablydance.com/2018/06/16/fibonacci-hashing-the-optimization-that-the-world-forgot-or-a-better-alternative-to-integer-modulo/">Malte
  * Skarupke's blog post</a>). Linear probing continues to work even when all hashCodes collide, just more slowly.
+ *
  * @author Nathan Sweet
- * @author Tommy Ettinger */
+ * @author Tommy Ettinger
+ */
 public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 	public int size;
-
-	K[] keyTable;
-	int[] valueTable;
-
-	float loadFactor;
-	int threshold;
-
-	/** Used by {@link #place(Object)} to bit shift the upper bits of a {@code long} into a usable range (&gt;= 0 and &lt;=
+	/**
+	 * Used by {@link #place(Object)} to bit shift the upper bits of a {@code long} into a usable range (&gt;= 0 and &lt;=
 	 * {@link #mask}). The shift can be negative, which is convenient to match the number of bits in mask: if mask is a 7-bit
 	 * number, a shift of -7 shifts the upper 7 bits into the lowest 7 positions. This class sets the shift &gt; 32 and &lt; 64,
 	 * which if used with an int will still move the upper bits of an int to the lower bits due to Java's implicit modulus on
 	 * shifts.
 	 * <p>
 	 * {@link #mask} can also be used to mask the low bits of a number, which may be faster for some hashcodes, if
-	 * {@link #place(Object)} is overridden. */
+	 * {@link #place(Object)} is overridden.
+	 */
 	protected int shift;
-
-	/** A bitmask used to confine hashcodes to the size of the table. Must be all 1 bits in its low positions, ie a power of two
+	/**
+	 * A bitmask used to confine hashcodes to the size of the table. Must be all 1 bits in its low positions, ie a power of two
 	 * minus 1. If {@link #place(Object)} is overriden, this can be used instead of {@link #shift} to isolate usable bits of a
-	 * hash. */
+	 * hash.
+	 */
 	protected int mask;
+	K[] keyTable;
+	int[] valueTable;
+	float loadFactor;
+	int threshold;
 
-	/** Creates a new map with an initial capacity of 51 and a load factor of 0.8. */
-	public ObjectIntMap () {
+	/**
+	 * Creates a new map with an initial capacity of 51 and a load factor of 0.8.
+	 */
+	public ObjectIntMap() {
 		this(51, 0.8f);
 	}
 
-	/** Creates a new map with a load factor of 0.8.
-	 * @param initialCapacity If not a power of two, it is increased to the next nearest power of two. */
-	public ObjectIntMap (int initialCapacity) {
+	/**
+	 * Creates a new map with a load factor of 0.8.
+	 *
+	 * @param initialCapacity If not a power of two, it is increased to the next nearest power of two.
+	 */
+	public ObjectIntMap(int initialCapacity) {
 		this(initialCapacity, 0.8f);
 	}
 
-	/** Creates a new map with the specified initial capacity and load factor. This map will hold initialCapacity items before
+	/**
+	 * Creates a new map with the specified initial capacity and load factor. This map will hold initialCapacity items before
 	 * growing the backing table.
-	 * @param initialCapacity If not a power of two, it is increased to the next nearest power of two. */
-	public ObjectIntMap (int initialCapacity, float loadFactor) {
+	 *
+	 * @param initialCapacity If not a power of two, it is increased to the next nearest power of two.
+	 */
+	public ObjectIntMap(int initialCapacity, float loadFactor) {
 		if (loadFactor <= 0f || loadFactor >= 1f)
 			throw new IllegalArgumentException("loadFactor must be > 0 and < 1: " + loadFactor);
 		this.loadFactor = loadFactor;
 
 		int tableSize = tableSize(initialCapacity, loadFactor);
-		threshold = (int)(tableSize * loadFactor);
+		threshold = (int) (tableSize * loadFactor);
 		mask = tableSize - 1;
 		shift = Long.numberOfLeadingZeros(mask);
 
-		keyTable = (K[])new Object[tableSize];
+		keyTable = (K[]) new Object[tableSize];
 		valueTable = new int[tableSize];
 	}
 
-	/** Creates a new map identical to the specified map. */
-	public ObjectIntMap (ObjectIntMap<? extends K> map) {
-		this((int)(map.keyTable.length * map.loadFactor), map.loadFactor);
+	/**
+	 * Creates a new map identical to the specified map.
+	 */
+	public ObjectIntMap(ObjectIntMap<? extends K> map) {
+		this((int) (map.keyTable.length * map.loadFactor), map.loadFactor);
 		System.arraycopy(map.keyTable, 0, keyTable, 0, map.keyTable.length);
 		System.arraycopy(map.valueTable, 0, valueTable, 0, map.valueTable.length);
 		size = map.size;
 	}
 
-	/** Returns an index >= 0 and <= {@link #mask} for the specified {@code item}.
+	static private int tableSize(int capacity, float loadFactor) {
+		if (capacity < 0) throw new IllegalArgumentException("capacity must be >= 0: " + capacity);
+		int tableSize = nextPowerOfTwo(Math.max(2, (int) Math.ceil(capacity / loadFactor)));
+		if (tableSize > 1 << 30) throw new IllegalArgumentException("The required capacity is too large: " + capacity);
+		return tableSize;
+	}
+
+	static private int nextPowerOfTwo(int value) {
+		if (value == 0) return 1;
+		value--;
+		value |= value >> 1;
+		value |= value >> 2;
+		value |= value >> 4;
+		value |= value >> 8;
+		value |= value >> 16;
+		return value + 1;
+	}
+
+	/**
+	 * Returns an index >= 0 and <= {@link #mask} for the specified {@code item}.
 	 * <p>
 	 * The default implementation uses Fibonacci hashing on the item's {@link Object#hashCode()}: the hashcode is multiplied by a
 	 * long constant (2 to the 64th, divided by the golden ratio) then the uppermost bits are shifted into the lowest positions to
@@ -117,25 +145,30 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 	 * <p>
 	 * This method can be overriden to customizing hashing. This may be useful eg in the unlikely event that most hashcodes are
 	 * Fibonacci numbers, if keys provide poor or incorrect hashcodes, or to simplify hashing if keys provide high quality
-	 * hashcodes and don't need Fibonacci hashing: {@code return item.hashCode() & mask;} */
-	protected int place (K item) {
-		return (int)(item.hashCode() * 0x9E3779B97F4A7C15L >>> shift);
+	 * hashcodes and don't need Fibonacci hashing: {@code return item.hashCode() & mask;}
+	 */
+	protected int place(K item) {
+		return (int) (item.hashCode() * 0x9E3779B97F4A7C15L >>> shift);
 	}
 
-	/** Returns the index of the key if already present, else -(index + 1) for the next empty index. This can be overridden in this
-	 * pacakge to compare for equality differently than {@link Object#equals(Object)}. */
-	int locateKey (K key) {
+	/**
+	 * Returns the index of the key if already present, else -(index + 1) for the next empty index. This can be overridden in this
+	 * pacakge to compare for equality differently than {@link Object#equals(Object)}.
+	 */
+	int locateKey(K key) {
 		if (key == null) throw new IllegalArgumentException("key cannot be null.");
 		K[] keyTable = this.keyTable;
-		for (int i = place(key);; i = i + 1 & mask) {
+		for (int i = place(key); ; i = i + 1 & mask) {
 			K other = keyTable[i];
 			if (other == null) return -(i + 1); // Empty space is available.
 			if (other.equals(key)) return i; // Same key was found.
 		}
 	}
 
-	/** Doesn't return a value, unlike other maps. */
-	public void put (K key, int value) {
+	/**
+	 * Doesn't return a value, unlike other maps.
+	 */
+	public void put(K key, int value) {
 		int i = locateKey(key);
 		if (i >= 0) { // Existing key was found.
 			valueTable[i] = value;
@@ -147,7 +180,7 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 		if (++size >= threshold) resize(keyTable.length << 1);
 	}
 
-	public void putAll (ObjectIntMap<? extends K> map) {
+	public void putAll(ObjectIntMap<? extends K> map) {
 		ensureCapacity(map.size);
 		K[] keyTable = map.keyTable;
 		int[] valueTable = map.valueTable;
@@ -158,10 +191,12 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 		}
 	}
 
-	/** Skips checks for existing keys, doesn't increment size. */
-	private void putResize (K key, int value) {
+	/**
+	 * Skips checks for existing keys, doesn't increment size.
+	 */
+	private void putResize(K key, int value) {
 		K[] keyTable = this.keyTable;
-		for (int i = place(key);; i = (i + 1) & mask) {
+		for (int i = place(key); ; i = (i + 1) & mask) {
 			if (keyTable[i] == null) {
 				keyTable[i] = key;
 				valueTable[i] = value;
@@ -170,15 +205,19 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 		}
 	}
 
-	/** Returns the value for the specified key, or the default value if the key is not in the map. */
-	public int get (K key, int defaultValue) {
+	/**
+	 * Returns the value for the specified key, or the default value if the key is not in the map.
+	 */
+	public int get(K key, int defaultValue) {
 		int i = locateKey(key);
 		return i < 0 ? defaultValue : valueTable[i];
 	}
 
-	/** Returns the key's current value and increments the stored value. If the key is not in the map, defaultValue + increment is
-	 * put into the map and defaultValue is returned. */
-	public int getAndIncrement (K key, int defaultValue, int increment) {
+	/**
+	 * Returns the key's current value and increments the stored value. If the key is not in the map, defaultValue + increment is
+	 * put into the map and defaultValue is returned.
+	 */
+	public int getAndIncrement(K key, int defaultValue, int increment) {
 		int i = locateKey(key);
 		if (i >= 0) { // Existing key was found.
 			int oldValue = valueTable[i];
@@ -192,7 +231,7 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 		return defaultValue;
 	}
 
-	public int remove (K key, int defaultValue) {
+	public int remove(K key, int defaultValue) {
 		int i = locateKey(key);
 		if (i < 0) return defaultValue;
 		K[] keyTable = this.keyTable;
@@ -213,27 +252,35 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 		return oldValue;
 	}
 
-	/** Returns true if the map has one or more items. */
-	public boolean notEmpty () {
+	/**
+	 * Returns true if the map has one or more items.
+	 */
+	public boolean notEmpty() {
 		return size > 0;
 	}
 
-	/** Returns true if the map is empty. */
-	public boolean isEmpty () {
+	/**
+	 * Returns true if the map is empty.
+	 */
+	public boolean isEmpty() {
 		return size == 0;
 	}
 
-	/** Reduces the size of the backing arrays to be the specified capacity / loadFactor, or less. If the capacity is already less,
+	/**
+	 * Reduces the size of the backing arrays to be the specified capacity / loadFactor, or less. If the capacity is already less,
 	 * nothing is done. If the map contains more items than the specified capacity, the next highest power of two capacity is used
-	 * instead. */
-	public void shrink (int maximumCapacity) {
+	 * instead.
+	 */
+	public void shrink(int maximumCapacity) {
 		if (maximumCapacity < 0) throw new IllegalArgumentException("maximumCapacity must be >= 0: " + maximumCapacity);
 		int tableSize = tableSize(maximumCapacity, loadFactor);
 		if (keyTable.length > tableSize) resize(tableSize);
 	}
 
-	/** Clears the map and reduces the size of the backing arrays to be the specified capacity / loadFactor, if they are larger. */
-	public void clear (int maximumCapacity) {
+	/**
+	 * Clears the map and reduces the size of the backing arrays to be the specified capacity / loadFactor, if they are larger.
+	 */
+	public void clear(int maximumCapacity) {
 		int tableSize = tableSize(maximumCapacity, loadFactor);
 		if (keyTable.length <= tableSize) {
 			clear();
@@ -243,15 +290,17 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 		resize(tableSize);
 	}
 
-	public void clear () {
+	public void clear() {
 		if (size == 0) return;
 		size = 0;
 		Arrays.fill(keyTable, null);
 	}
 
-	/** Returns true if the specified value is in the map. Note this traverses the entire map and compares every value, which may
-	 * be an expensive operation. */
-	public boolean containsValue (int value) {
+	/**
+	 * Returns true if the specified value is in the map. Note this traverses the entire map and compares every value, which may
+	 * be an expensive operation.
+	 */
+	public boolean containsValue(int value) {
 		K[] keyTable = this.keyTable;
 		int[] valueTable = this.valueTable;
 		for (int i = valueTable.length - 1; i >= 0; i--)
@@ -259,14 +308,16 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 		return false;
 	}
 
-	public boolean containsKey (K key) {
+	public boolean containsKey(K key) {
 		return locateKey(key) >= 0;
 	}
 
-	/** Returns the key for the specified value, or null if it is not in the map. Note this traverses the entire map and compares
-	 * every value, which may be an expensive operation. */
+	/**
+	 * Returns the key for the specified value, or null if it is not in the map. Note this traverses the entire map and compares
+	 * every value, which may be an expensive operation.
+	 */
 	// @Null
-	public K findKey (int value) {
+	public K findKey(int value) {
 		K[] keyTable = this.keyTable;
 		int[] valueTable = this.valueTable;
 		for (int i = valueTable.length - 1; i >= 0; i--) {
@@ -276,23 +327,25 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 		return null;
 	}
 
-	/** Increases the size of the backing array to accommodate the specified number of additional items / loadFactor. Useful before
-	 * adding many items to avoid multiple backing array resizes. */
-	public void ensureCapacity (int additionalCapacity) {
+	/**
+	 * Increases the size of the backing array to accommodate the specified number of additional items / loadFactor. Useful before
+	 * adding many items to avoid multiple backing array resizes.
+	 */
+	public void ensureCapacity(int additionalCapacity) {
 		int tableSize = tableSize(size + additionalCapacity, loadFactor);
 		if (keyTable.length < tableSize) resize(tableSize);
 	}
 
-	final void resize (int newSize) {
+	final void resize(int newSize) {
 		int oldCapacity = keyTable.length;
-		threshold = (int)(newSize * loadFactor);
+		threshold = (int) (newSize * loadFactor);
 		mask = newSize - 1;
 		shift = Long.numberOfLeadingZeros(mask);
 
 		K[] oldKeyTable = keyTable;
 		int[] oldValueTable = valueTable;
 
-		keyTable = (K[])new Object[newSize];
+		keyTable = (K[]) new Object[newSize];
 		valueTable = new int[newSize];
 
 		if (size > 0) {
@@ -303,7 +356,7 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 		}
 	}
 
-	public int hashCode () {
+	public int hashCode() {
 		int h = size;
 		K[] keyTable = this.keyTable;
 		int[] valueTable = this.valueTable;
@@ -314,10 +367,11 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 		return h;
 	}
 
-	public boolean equals (Object obj) {
+	@SuppressWarnings("rawtypes")
+	public boolean equals(Object obj) {
 		if (obj == this) return true;
 		if (!(obj instanceof ObjectIntMap)) return false;
-		ObjectIntMap other = (ObjectIntMap)obj;
+		ObjectIntMap other = (ObjectIntMap) obj;
 		if (other.size != size) return false;
 		K[] keyTable = this.keyTable;
 		int[] valueTable = this.valueTable;
@@ -332,15 +386,15 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 		return true;
 	}
 
-	public String toString (String separator) {
+	public String toString(String separator) {
 		return toString(separator, false);
 	}
 
-	public String toString () {
+	public String toString() {
 		return toString(", ", true);
 	}
 
-	private String toString (String separator, boolean braces) {
+	private String toString(String separator, boolean braces) {
 		if (size == 0) return braces ? "{}" : "";
 		java.lang.StringBuilder buffer = new java.lang.StringBuilder(32);
 		if (braces) buffer.append('{');
@@ -367,73 +421,60 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 		return buffer.toString();
 	}
 
-	public Entries<K> iterator () {
+	public Entries<K> iterator() {
 		return entries();
 	}
 
-	/** Returns an iterator for the entries in the map. Remove is supported. */
-	public Entries<K> entries () {
-		return new Entries(this);
+	/**
+	 * Returns an iterator for the entries in the map. Remove is supported.
+	 */
+	public Entries<K> entries() {
+		return new Entries<>(this);
 	}
 
-	/** Returns an iterator for the values in the map. Remove is supported. */
-	public Values values () {
+	/**
+	 * Returns an iterator for the values in the map. Remove is supported.
+	 */
+	public Values values() {
 		return new Values(this);
 	}
 
-	/** Returns an iterator for the keys in the map. Remove is supported. */
-	public Keys<K> keys () {
-		return new Keys(this);
-	}
-
-	static private int tableSize (int capacity, float loadFactor) {
-		if (capacity < 0) throw new IllegalArgumentException("capacity must be >= 0: " + capacity);
-		int tableSize = nextPowerOfTwo(Math.max(2, (int)Math.ceil(capacity / loadFactor)));
-		if (tableSize > 1 << 30) throw new IllegalArgumentException("The required capacity is too large: " + capacity);
-		return tableSize;
-	}
-
-	static private int nextPowerOfTwo (int value) {
-		if (value == 0) return 1;
-		value--;
-		value |= value >> 1;
-		value |= value >> 2;
-		value |= value >> 4;
-		value |= value >> 8;
-		value |= value >> 16;
-		return value + 1;
+	/**
+	 * Returns an iterator for the keys in the map. Remove is supported.
+	 */
+	public Keys<K> keys() {
+		return new Keys<>(this);
 	}
 
 	static public class Entry<K> {
 		public K key;
 		public int value;
 
-		public String toString () {
+		public String toString() {
 			return key + "=" + value;
 		}
 	}
 
 	static private class MapIterator<K> {
-		public boolean hasNext;
-
 		final ObjectIntMap<K> map;
+		public boolean hasNext;
 		int nextIndex, currentIndex;
-		boolean valid = true;
+		final boolean valid = true;
 
-		public MapIterator (ObjectIntMap<K> map) {
+		public MapIterator(ObjectIntMap<K> map) {
 			this.map = map;
 			reset();
 		}
 
-		public void reset () {
+		public void reset() {
 			currentIndex = -1;
 			nextIndex = -1;
 			findNextIndex();
 		}
 
-		void findNextIndex () {
+		void findNextIndex() {
 			K[] keyTable = map.keyTable;
-			for (int n = keyTable.length; ++nextIndex < n;) {
+			for (int n = keyTable.length; ++nextIndex < n; ) {
 				if (keyTable[nextIndex] != null) {
 					hasNext = true;
 					return;
@@ -442,7 +483,7 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 			hasNext = false;
 		}
 
-		public void remove () {
+		public void remove() {
 			int i = currentIndex;
 			if (i < 0) throw new IllegalStateException("next must be called before remove.");
 			K[] keyTable = map.keyTable;
@@ -466,14 +507,16 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 	}
 
 	static public class Entries<K> extends MapIterator<K> implements Iterable<Entry<K>>, Iterator<Entry<K>> {
-		Entry<K> entry = new Entry<K>();
+		final Entry<K> entry = new Entry<>();
 
-		public Entries (ObjectIntMap<K> map) {
+		public Entries(ObjectIntMap<K> map) {
 			super(map);
 		}
 
-		/** Note the same entry instance is returned each time this method is called. */
-		public Entry<K> next () {
+		/**
+		 * Note the same entry instance is returned each time this method is called.
+		 */
+		public Entry<K> next() {
 			if (!hasNext) throw new NoSuchElementException();
 			if (!valid) throw new KryoException("#iterator() cannot be used nested.");
 			K[] keyTable = map.keyTable;
@@ -484,27 +527,27 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 			return entry;
 		}
 
-		public boolean hasNext () {
+		public boolean hasNext() {
 			if (!valid) throw new KryoException("#iterator() cannot be used nested.");
 			return hasNext;
 		}
 
-		public Entries<K> iterator () {
+		public Entries<K> iterator() {
 			return this;
 		}
 	}
 
 	static public class Values extends MapIterator<Object> {
-		public Values (ObjectIntMap<?> map) {
-			super((ObjectIntMap<Object>)map);
+		public Values(ObjectIntMap<?> map) {
+			super((ObjectIntMap<Object>) map);
 		}
 
-		public boolean hasNext () {
+		public boolean hasNext() {
 			if (!valid) throw new KryoException("#iterator() cannot be used nested.");
 			return hasNext;
 		}
 
-		public int next () {
+		public int next() {
 			if (!hasNext) throw new NoSuchElementException();
 			if (!valid) throw new KryoException("#iterator() cannot be used nested.");
 			int value = map.valueTable[nextIndex];
@@ -513,20 +556,24 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 			return value;
 		}
 
-		public Values iterator () {
+		public Values iterator() {
 			return this;
 		}
 
-		/** Returns a new array containing the remaining values. */
-		public IntArray toArray () {
+		/**
+		 * Returns a new array containing the remaining values.
+		 */
+		public IntArray toArray() {
 			IntArray array = new IntArray(true, map.size);
 			while (hasNext)
 				array.add(next());
 			return array;
 		}
 
-		/** Adds the remaining values to the specified array. */
-		public IntArray toArray (IntArray array) {
+		/**
+		 * Adds the remaining values to the specified array.
+		 */
+		public IntArray toArray(IntArray array) {
 			while (hasNext)
 				array.add(next());
 			return array;
@@ -534,16 +581,16 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 	}
 
 	static public class Keys<K> extends MapIterator<K> implements Iterable<K>, Iterator<K> {
-		public Keys (ObjectIntMap<K> map) {
+		public Keys(ObjectIntMap<K> map) {
 			super(map);
 		}
 
-		public boolean hasNext () {
+		public boolean hasNext() {
 			if (!valid) throw new KryoException("#iterator() cannot be used nested.");
 			return hasNext;
 		}
 
-		public K next () {
+		public K next() {
 			if (!hasNext) throw new NoSuchElementException();
 			if (!valid) throw new KryoException("#iterator() cannot be used nested.");
 			K key = map.keyTable[nextIndex];
@@ -552,17 +599,21 @@ public class ObjectIntMap<K> implements Iterable<ObjectIntMap.Entry<K>> {
 			return key;
 		}
 
-		public Keys<K> iterator () {
+		public Keys<K> iterator() {
 			return this;
 		}
 
-		/** Returns a new list containing the remaining keys. */
-		public ArrayList<K> toList () {
-			return toList(new ArrayList(map.size));
+		/**
+		 * Returns a new list containing the remaining keys.
+		 */
+		public ArrayList<K> toList() {
+			return toList(new ArrayList<>(map.size));
 		}
 
-		/** Adds the remaining keys to the list. */
-		public <T extends List<K>> T toList (T array) {
+		/**
+		 * Adds the remaining keys to the list.
+		 */
+		public <T extends List<K>> T toList(T array) {
 			while (hasNext)
 				array.add(next());
 			return array;

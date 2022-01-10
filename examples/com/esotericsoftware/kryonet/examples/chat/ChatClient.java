@@ -1,4 +1,3 @@
-
 package com.esotericsoftware.kryonet.examples.chat;
 
 import java.awt.BorderLayout;
@@ -40,7 +39,7 @@ public class ChatClient {
 	Client client;
 	String name;
 
-	public ChatClient () {
+	public ChatClient() {
 		client = new Client();
 		client.start();
 
@@ -49,29 +48,29 @@ public class ChatClient {
 		Network.register(client);
 
 		client.addListener(new Listener() {
-			public void connected (Connection connection) {
+			public void connected(Connection connection) {
 				RegisterName registerName = new RegisterName();
 				registerName.name = name;
 				client.sendTCP(registerName);
 			}
 
-			public void received (Connection connection, Object object) {
+			public void received(Connection connection, Object object) {
 				if (object instanceof UpdateNames) {
-					UpdateNames updateNames = (UpdateNames)object;
+					UpdateNames updateNames = (UpdateNames) object;
 					chatFrame.setNames(updateNames.names);
 					return;
 				}
 
 				if (object instanceof ChatMessage) {
-					ChatMessage chatMessage = (ChatMessage)object;
+					ChatMessage chatMessage = (ChatMessage) object;
 					chatFrame.addMessage(chatMessage.text);
 					return;
 				}
 			}
 
-			public void disconnected (Connection connection) {
+			public void disconnected(Connection connection) {
 				EventQueue.invokeLater(new Runnable() {
-					public void run () {
+					public void run() {
 						// Closing the frame calls the close listener which will stop the client's update thread.
 						chatFrame.dispose();
 					}
@@ -80,14 +79,14 @@ public class ChatClient {
 		});
 
 		// Request the host from the user.
-		String input = (String)JOptionPane.showInputDialog(null, "Host:", "Connect to chat server", JOptionPane.QUESTION_MESSAGE,
-			null, null, "localhost");
+		String input = (String) JOptionPane.showInputDialog(null, "Host:", "Connect to chat server", JOptionPane.QUESTION_MESSAGE,
+				null, null, "localhost");
 		if (input == null || input.trim().length() == 0) System.exit(1);
 		final String host = input.trim();
 
 		// Request the user's name.
-		input = (String)JOptionPane.showInputDialog(null, "Name:", "Connect to chat server", JOptionPane.QUESTION_MESSAGE, null,
-			null, "Test");
+		input = (String) JOptionPane.showInputDialog(null, "Name:", "Connect to chat server", JOptionPane.QUESTION_MESSAGE, null,
+				null, "Test");
 		if (input == null || input.trim().length() == 0) System.exit(1);
 		name = input.trim();
 
@@ -95,7 +94,7 @@ public class ChatClient {
 		chatFrame = new ChatFrame(host);
 		// This listener is called when the send button is clicked.
 		chatFrame.setSendListener(new Runnable() {
-			public void run () {
+			public void run() {
 				ChatMessage chatMessage = new ChatMessage();
 				chatMessage.text = chatFrame.getSendText();
 				client.sendTCP(chatMessage);
@@ -103,7 +102,7 @@ public class ChatClient {
 		});
 		// This listener is called when the chat window is closed.
 		chatFrame.setCloseListener(new Runnable() {
-			public void run () {
+			public void run() {
 				client.stop();
 			}
 		});
@@ -112,7 +111,7 @@ public class ChatClient {
 		// We'll do the connect on a new thread so the ChatFrame can show a progress bar.
 		// Connecting to localhost is usually so fast you won't see the progress bar.
 		new Thread("Connect") {
-			public void run () {
+			public void run() {
 				try {
 					client.connect(5000, host, Network.port);
 					// Server communication after connection can go here, or in Listener#connected().
@@ -124,6 +123,11 @@ public class ChatClient {
 		}.start();
 	}
 
+	public static void main(String[] args) {
+		Log.set(Log.LEVEL_DEBUG);
+		new ChatClient();
+	}
+
 	static private class ChatFrame extends JFrame {
 		CardLayout cardLayout;
 		JProgressBar progressBar;
@@ -132,7 +136,7 @@ public class ChatClient {
 		JButton sendButton;
 		JList nameList;
 
-		public ChatFrame (String host) {
+		public ChatFrame(String host) {
 			super("Chat Client");
 			setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 			setSize(640, 200);
@@ -165,7 +169,7 @@ public class ChatClient {
 						nameList.setModel(new DefaultListModel());
 					}
 					DefaultListSelectionModel disableSelections = new DefaultListSelectionModel() {
-						public void setSelectionInterval (int index0, int index1) {
+						public void setSelectionInterval(int index0, int index1) {
 						}
 					};
 					messageList.setSelectionModel(disableSelections);
@@ -175,22 +179,22 @@ public class ChatClient {
 					JPanel bottomPanel = new JPanel(new GridBagLayout());
 					panel.add(bottomPanel, BorderLayout.SOUTH);
 					bottomPanel.add(sendText = new JTextField(), new GridBagConstraints(0, 0, 1, 1, 1, 0, GridBagConstraints.CENTER,
-						GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
+							GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
 					bottomPanel.add(sendButton = new JButton("Send"), new GridBagConstraints(1, 0, 1, 1, 0, 0,
-						GridBagConstraints.CENTER, 0, new Insets(0, 0, 0, 0), 0, 0));
+							GridBagConstraints.CENTER, 0, new Insets(0, 0, 0, 0), 0, 0));
 				}
 			}
 
 			sendText.addActionListener(new ActionListener() {
-				public void actionPerformed (ActionEvent e) {
+				public void actionPerformed(ActionEvent e) {
 					sendButton.doClick();
 				}
 			});
 		}
 
-		public void setSendListener (final Runnable listener) {
+		public void setSendListener(final Runnable listener) {
 			sendButton.addActionListener(new ActionListener() {
-				public void actionPerformed (ActionEvent evt) {
+				public void actionPerformed(ActionEvent evt) {
 					if (getSendText().length() == 0) return;
 					listener.run();
 					sendText.setText("");
@@ -199,29 +203,29 @@ public class ChatClient {
 			});
 		}
 
-		public void setCloseListener (final Runnable listener) {
+		public void setCloseListener(final Runnable listener) {
 			addWindowListener(new WindowAdapter() {
-				public void windowClosed (WindowEvent evt) {
+				public void windowClosed(WindowEvent evt) {
 					listener.run();
 				}
 
-				public void windowActivated (WindowEvent evt) {
+				public void windowActivated(WindowEvent evt) {
 					sendText.requestFocus();
 				}
 			});
 		}
 
-		public String getSendText () {
+		public String getSendText() {
 			return sendText.getText().trim();
 		}
 
-		public void setNames (final String[] names) {
+		public void setNames(final String[] names) {
 			// This listener is run on the client's update thread, which was started by client.start().
 			// We must be careful to only interact with Swing components on the Swing event thread.
 			EventQueue.invokeLater(new Runnable() {
-				public void run () {
+				public void run() {
 					cardLayout.show(getContentPane(), "chat");
-					DefaultListModel model = (DefaultListModel)nameList.getModel();
+					DefaultListModel model = (DefaultListModel) nameList.getModel();
 					model.removeAllElements();
 					for (String name : names)
 						model.addElement(name);
@@ -229,19 +233,14 @@ public class ChatClient {
 			});
 		}
 
-		public void addMessage (final String message) {
+		public void addMessage(final String message) {
 			EventQueue.invokeLater(new Runnable() {
-				public void run () {
-					DefaultListModel model = (DefaultListModel)messageList.getModel();
+				public void run() {
+					DefaultListModel model = (DefaultListModel) messageList.getModel();
 					model.addElement(message);
 					messageList.ensureIndexIsVisible(model.size() - 1);
 				}
 			});
 		}
-	}
-
-	public static void main (String[] args) {
-		Log.set(Log.LEVEL_DEBUG);
-		new ChatClient();
 	}
 }

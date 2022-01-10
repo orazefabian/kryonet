@@ -1,4 +1,3 @@
-
 package com.esotericsoftware.kryonet.examples.chat;
 
 import java.awt.event.WindowAdapter;
@@ -20,9 +19,9 @@ import com.esotericsoftware.minlog.Log;
 public class ChatServer {
 	Server server;
 
-	public ChatServer () throws IOException {
+	public ChatServer() throws IOException {
 		server = new Server() {
-			protected Connection newConnection () {
+			protected Connection newConnection() {
 				// By providing our own connection implementation, we can store per
 				// connection state without a connection ID to state look up.
 				return new ChatConnection();
@@ -34,16 +33,16 @@ public class ChatServer {
 		Network.register(server);
 
 		server.addListener(new Listener() {
-			public void received (Connection c, Object object) {
+			public void received(Connection c, Object object) {
 				// We know all connections for this server are actually ChatConnections.
-				ChatConnection connection = (ChatConnection)c;
+				ChatConnection connection = (ChatConnection) c;
 
 				if (object instanceof RegisterName) {
 					// Ignore the object if a client has already registered a name. This is
 					// impossible with our client, but a hacker could send messages at any time.
 					if (connection.name != null) return;
 					// Ignore the object if the name is invalid.
-					String name = ((RegisterName)object).name;
+					String name = ((RegisterName) object).name;
 					if (name == null) return;
 					name = name.trim();
 					if (name.length() == 0) return;
@@ -61,7 +60,7 @@ public class ChatServer {
 				if (object instanceof ChatMessage) {
 					// Ignore the object if a client tries to chat before registering a name.
 					if (connection.name == null) return;
-					ChatMessage chatMessage = (ChatMessage)object;
+					ChatMessage chatMessage = (ChatMessage) object;
 					// Ignore the object if the chat message is invalid.
 					String message = chatMessage.text;
 					if (message == null) return;
@@ -74,8 +73,8 @@ public class ChatServer {
 				}
 			}
 
-			public void disconnected (Connection c) {
-				ChatConnection connection = (ChatConnection)c;
+			public void disconnected(Connection c) {
+				ChatConnection connection = (ChatConnection) c;
 				if (connection.name != null) {
 					// Announce to everyone that someone (with a registered name) has left.
 					ChatMessage chatMessage = new ChatMessage();
@@ -92,7 +91,7 @@ public class ChatServer {
 		JFrame frame = new JFrame("Chat Server");
 		frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 		frame.addWindowListener(new WindowAdapter() {
-			public void windowClosed (WindowEvent evt) {
+			public void windowClosed(WindowEvent evt) {
 				server.stop();
 			}
 		});
@@ -102,27 +101,27 @@ public class ChatServer {
 		frame.setVisible(true);
 	}
 
-	void updateNames () {
+	public static void main(String[] args) throws IOException {
+		Log.set(Log.LEVEL_DEBUG);
+		new ChatServer();
+	}
+
+	void updateNames() {
 		// Collect the names for each connection.
 		Connection[] connections = server.getConnections();
 		ArrayList names = new ArrayList(connections.length);
 		for (int i = connections.length - 1; i >= 0; i--) {
-			ChatConnection connection = (ChatConnection)connections[i];
+			ChatConnection connection = (ChatConnection) connections[i];
 			names.add(connection.name);
 		}
 		// Send the names to everyone.
 		UpdateNames updateNames = new UpdateNames();
-		updateNames.names = (String[])names.toArray(new String[names.size()]);
+		updateNames.names = (String[]) names.toArray(new String[names.size()]);
 		server.sendToAllTCP(updateNames);
 	}
 
 	// This holds per connection state.
 	static class ChatConnection extends Connection {
 		public String name;
-	}
-
-	public static void main (String[] args) throws IOException {
-		Log.set(Log.LEVEL_DEBUG);
-		new ChatServer();
 	}
 }
