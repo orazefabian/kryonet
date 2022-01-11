@@ -308,7 +308,6 @@ public class Server implements EndPoint {
 						}
 						if (fromAddress == null) continue;
 
-						Connection[] connections = this.connections;
 						for (Connection connection : connections) {
 							if (fromAddress.equals(connection.udpRemoteAddress)) {
 								fromConnection = connection;
@@ -385,7 +384,6 @@ public class Server implements EndPoint {
 			}
 		}
 		long time = System.currentTimeMillis();
-		Connection[] connections = this.connections;
 		for (Connection connection : connections) {
 			if (connection.tcp.isTimedOut(time)) {
 				if (DEBUG) debug("kryonet", connection + " timed out.");
@@ -399,7 +397,6 @@ public class Server implements EndPoint {
 
 	private void keepAlive() {
 		long time = System.currentTimeMillis();
-		Connection[] connections = this.connections;
 		for (Connection connection : connections) {
 			if (connection.tcp.needsKeepAlive(time)) connection.sendTCP(FrameworkMessage.keepAlive);
 		}
@@ -488,21 +485,18 @@ public class Server implements EndPoint {
 	// BOZO - Provide mechanism for sending to multiple clients without serializing multiple times.
 
 	public void sendToAllTCP(Object object) {
-		Connection[] connections = this.connections;
 		for (Connection connection : connections) {
 			connection.sendTCP(object);
 		}
 	}
 
 	public void sendToAllExceptTCP(int connectionID, Object object) {
-		Connection[] connections = this.connections;
 		for (Connection connection : connections) {
 			if (connection.id != connectionID) connection.sendTCP(object);
 		}
 	}
 
 	public void sendToTCP(int connectionID, Object object) {
-		Connection[] connections = this.connections;
 		for (Connection connection : connections) {
 			if (connection.id == connectionID) {
 				connection.sendTCP(object);
@@ -512,21 +506,18 @@ public class Server implements EndPoint {
 	}
 
 	public void sendToAllUDP(Object object) {
-		Connection[] connections = this.connections;
 		for (Connection connection : connections) {
 			connection.sendUDP(object);
 		}
 	}
 
 	public void sendToAllExceptUDP(int connectionID, Object object) {
-		Connection[] connections = this.connections;
 		for (Connection connection : connections) {
 			if (connection.id != connectionID) connection.sendUDP(object);
 		}
 	}
 
 	public void sendToUDP(int connectionID, Object object) {
-		Connection[] connections = this.connections;
 		for (Connection connection : connections) {
 			if (connection.id == connectionID) {
 				connection.sendUDP(object);
@@ -561,7 +552,6 @@ public class Server implements EndPoint {
 	 * Closes all open connections and the server port(s).
 	 */
 	public void close() {
-		Connection[] connections = this.connections;
 		if (INFO && connections.length > 0) info("kryonet", "Closing server connections...");
 		for (Connection connection : connections) connection.close();
 		connections = new Connection[0];
