@@ -19,12 +19,19 @@
 
 package com.esotericsoftware.kryonet;
 
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+
 import java.io.IOException;
 
-public class MultipleThreadTest extends KryoNetTestCase {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+@ExtendWith(KryonetExtension.class)
+public class MultipleThreadTest {
 	int receivedServer, receivedClient1, receivedClient2;
 
-	public void testMultipleThreads() throws IOException {
+	@Test
+	public void testMultipleThreads(KryonetExtension.Kryonet extension) throws IOException {
 		receivedServer = 0;
 
 		final int messageCount = 10;
@@ -34,12 +41,12 @@ public class MultipleThreadTest extends KryoNetTestCase {
 
 		final Server server = new Server(16384, 8192);
 		server.getKryo().register(String[].class);
-		startEndPoint(server);
-		server.bind(tcpPort, udpPort);
+		extension.startEndPoint(server);
+		server.bind(extension.tcpPort, extension.udpPort);
 		server.addListener(new Listener() {
 			public void received(Connection connection, Object object) {
 				receivedServer++;
-				if (receivedServer == messageCount * clients) stopEndPoints();
+				if (receivedServer == messageCount * clients) extension.stopEndPoints();
 			}
 		});
 
@@ -48,7 +55,7 @@ public class MultipleThreadTest extends KryoNetTestCase {
 		for (int i = 0; i < clients; i++) {
 			Client client = new Client(16384, 8192);
 			client.getKryo().register(String[].class);
-			startEndPoint(client);
+			extension.startEndPoint(client);
 			client.addListener(new Listener() {
 				int received;
 
@@ -67,7 +74,7 @@ public class MultipleThreadTest extends KryoNetTestCase {
 					}
 				}
 			});
-			client.connect(5000, host, tcpPort, udpPort);
+			client.connect(5000, extension.host, server.getTcpPort(), server.getUdpPort());
 		}
 
 		for (int i = 0; i < threads; i++) {
@@ -86,7 +93,7 @@ public class MultipleThreadTest extends KryoNetTestCase {
 			}.start();
 		}
 
-		waitForThreads(5000);
+		extension.waitForThreads(5000);
 
 		assertEquals(messageCount * clients, receivedServer);
 	}

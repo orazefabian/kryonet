@@ -19,12 +19,20 @@
 
 package com.esotericsoftware.kryonet;
 
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class UnregisteredClassTest extends KryoNetTestCase {
-	public void testUnregisteredClasses() throws IOException {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+
+@ExtendWith(KryonetExtension.class)
+public class UnregisteredClassTest {
+	@Test
+	public void testUnregisteredClasses(KryonetExtension.Kryonet extension) throws IOException {
 		final Data dataTCP = new Data();
 		populateData(dataTCP, true);
 		final Data dataUDP = new Data();
@@ -35,8 +43,8 @@ public class UnregisteredClassTest extends KryoNetTestCase {
 
 		final Server server = new Server(1024 * 32, 1024 * 16);
 		server.getKryo().setRegistrationRequired(false);
-		startEndPoint(server);
-		server.bind(tcpPort, udpPort);
+		extension.startEndPoint(server);
+		server.bind(extension.tcpPort, extension.udpPort);
 		server.addListener(new Listener() {
 			public void connected(Connection connection) {
 				connection.sendTCP(dataTCP);
@@ -61,7 +69,7 @@ public class UnregisteredClassTest extends KryoNetTestCase {
 
 		final Client client = new Client(1024 * 32, 1024 * 16);
 		client.getKryo().setRegistrationRequired(false);
-		startEndPoint(client);
+		extension.startEndPoint(client);
 		client.addListener(new Listener() {
 			public void received(Connection connection, Object object) {
 				if (object instanceof Data) {
@@ -79,9 +87,9 @@ public class UnregisteredClassTest extends KryoNetTestCase {
 			}
 		});
 
-		client.connect(5000, host, tcpPort, udpPort);
+		client.connect(5000, extension.host, server.getTcpPort(), server.getUdpPort());
 
-		waitForThreads(5000);
+		extension.waitForThreads(5000);
 
 		assertEquals(2, receivedTCP.intValue());
 		assertEquals(2, receivedUDP.intValue());

@@ -20,21 +20,27 @@
 package com.esotericsoftware.kryonet;
 
 import com.esotericsoftware.kryonet.util.InputStreamSender;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
-public class InputStreamSenderTest extends KryoNetTestCase {
+import static org.junit.jupiter.api.Assertions.fail;
+
+@ExtendWith(KryonetExtension.class)
+public class InputStreamSenderTest {
 	boolean success;
 
-	public void testStream() throws IOException {
+	@Test
+	public void testStream(KryonetExtension.Kryonet extension) throws IOException {
 		final int largeDataSize = 12345;
 
 		final Server server = new Server(16384, 8192);
 		server.getKryo().setRegistrationRequired(false);
-		startEndPoint(server);
-		server.bind(tcpPort, udpPort);
+		extension.startEndPoint(server);
+		server.bind(extension.tcpPort, extension.udpPort);
 		server.addListener(new Listener() {
 			public void connected(Connection connection) {
 				ByteArrayOutputStream output = new ByteArrayOutputStream(largeDataSize);
@@ -60,7 +66,7 @@ public class InputStreamSenderTest extends KryoNetTestCase {
 
 		final Client client = new Client(16384, 8192);
 		client.getKryo().setRegistrationRequired(false);
-		startEndPoint(client);
+		extension.startEndPoint(client);
 		client.addListener(new Listener() {
 			int total;
 
@@ -71,15 +77,15 @@ public class InputStreamSenderTest extends KryoNetTestCase {
 					total += length;
 					if (total == largeDataSize) {
 						success = true;
-						stopEndPoints();
+						extension.stopEndPoints();
 					}
 				}
 			}
 		});
 
-		client.connect(5000, host, tcpPort, udpPort);
+		client.connect(5000, extension.host, server.getTcpPort(), server.getUdpPort());
 
-		waitForThreads(5000);
+		extension.waitForThreads(5000);
 		if (!success) fail();
 	}
 }
