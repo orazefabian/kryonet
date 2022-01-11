@@ -24,18 +24,22 @@ import com.esotericsoftware.kryo.serializers.CollectionSerializer;
 import com.esotericsoftware.kryo.serializers.DeflateSerializer;
 import com.esotericsoftware.kryo.serializers.FieldSerializer;
 import com.esotericsoftware.kryonet.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.IOException;
 import java.util.ArrayList;
 
-public class DeflateTest extends KryoNetTestCase {
+@ExtendWith(KryonetExtension.class)
+public class DeflateTest {
 	static public void register(Kryo kryo) {
 		kryo.register(short[].class);
 		kryo.register(SomeData.class, new DeflateSerializer(new FieldSerializer(kryo, SomeData.class)));
 		kryo.register(ArrayList.class, new CollectionSerializer());
 	}
 
-	public void testDeflate() throws IOException {
+	@Test
+	public void testDeflate(KryonetExtension.Kryonet extension) throws IOException {
 		final Server server = new Server();
 		register(server.getKryo());
 
@@ -48,8 +52,8 @@ public class DeflateTest extends KryoNetTestCase {
 		a.add(null);
 		a.add(34);
 
-		startEndPoint(server);
-		server.bind(tcpPort, udpPort);
+		extension.startEndPoint(server);
+		server.bind(extension.tcpPort, extension.udpPort);
 		server.addListener(new Listener() {
 			public void connected(Connection connection) {
 				server.sendToAllTCP(data);
@@ -62,20 +66,20 @@ public class DeflateTest extends KryoNetTestCase {
 
 		final Client client = new Client();
 		register(client.getKryo());
-		startEndPoint(client);
+		extension.startEndPoint(client);
 		client.addListener(new Listener() {
 			public void received(Connection connection, Object object) {
 				if (object instanceof SomeData) {
 					SomeData data = (SomeData) object;
 					System.out.println(data.stuff[3]);
 				} else if (object instanceof ArrayList) {
-					stopEndPoints();
+					extension.stopEndPoints();
 				}
 			}
 		});
-		client.connect(5000, host, tcpPort, udpPort);
+		client.connect(5000, extension.host, server.getTcpPort(), server.getUdpPort());
 
-		waitForThreads();
+		extension.waitForThreads();
 	}
 
 	static public class SomeData {

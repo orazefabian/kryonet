@@ -21,6 +21,8 @@ package com.esotericsoftware.kryonet;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -28,21 +30,26 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.esotericsoftware.minlog.Log.info;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
-public class DiscoverHostTest extends KryoNetTestCase {
+@ExtendWith(KryonetExtension.class)
+public class DiscoverHostTest {
 
-	public void testBroadcast() throws IOException {
+	@Test
+	public void testBroadcast(KryonetExtension.Kryonet extension) throws IOException {
 		// This server exists solely to reply to Client#discoverHost.
 		// It wouldn't be needed if the real server was using UDP.
 		final Server broadcastServer = new Server();
-		startEndPoint(broadcastServer);
-		broadcastServer.bind(0, udpPort);
+		extension.startEndPoint(broadcastServer);
+		broadcastServer.bind(extension.tcpPort, extension.udpPort);
 
 		final Server server = new Server();
-		startEndPoint(server);
-		server.bind(54555);
+		extension.startEndPoint(server);
+		server.bind(0);
 		server.addListener(new Listener() {
 			public void disconnected(Connection connection) {
 				broadcastServer.stop();
@@ -53,21 +60,23 @@ public class DiscoverHostTest extends KryoNetTestCase {
 		// ----
 
 		Client client = new Client();
-		InetAddress host = client.discoverHost(udpPort, 2000);
+		InetAddress host = client.discoverHost(broadcastServer.getUdpPort(), 2000);
 		if (host == null) {
-			stopEndPoints();
+			extension.stopEndPoints();
 			fail("No servers found.");
 			return;
 		}
 
-		startEndPoint(client);
-		client.connect(2000, host, tcpPort);
+		extension.startEndPoint(client);
+		client.connect(2000, host, server.getTcpPort());
 		client.stop();
 
-		waitForThreads();
+		extension.waitForThreads();
 	}
 
-	public void testCustomBroadcast() throws IOException {
+	@Test
+	public void testCustomBroadcast(KryonetExtension.Kryonet extension) throws IOException {
+		final AtomicInteger port = new AtomicInteger();
 
 		ServerDiscoveryHandler serverDiscoveryHandler = new ServerDiscoveryHandler() {
 			@Override
@@ -112,7 +121,7 @@ public class DiscoverHostTest extends KryoNetTestCase {
 					assertEquals(42, packet.id);
 					assertEquals("gameName", packet.gameName);
 					assertEquals("playerName", packet.playerName);
-					assertEquals(udpPort, datagramPacket.getPort());
+					assertEquals(port.get(), datagramPacket.getPort());
 				}
 			}
 
@@ -131,12 +140,13 @@ public class DiscoverHostTest extends KryoNetTestCase {
 		broadcastServer.getKryo().register(DiscoveryResponsePacket.class);
 		broadcastServer.setDiscoveryHandler(serverDiscoveryHandler);
 
-		startEndPoint(broadcastServer);
-		broadcastServer.bind(0, udpPort);
+		extension.startEndPoint(broadcastServer);
+		broadcastServer.bind(0, extension.udpPort);
+		port.set(broadcastServer.getUdpPort());
 
 		final Server server = new Server();
-		startEndPoint(server);
-		server.bind(54555);
+		extension.startEndPoint(server);
+		server.bind(0);
 		server.addListener(new Listener() {
 			public void disconnected(Connection connection) {
 				broadcastServer.stop();
@@ -151,18 +161,18 @@ public class DiscoverHostTest extends KryoNetTestCase {
 		client.getKryo().register(DiscoveryResponsePacket.class);
 		client.setDiscoveryHandler(clientDiscoveryHandler);
 
-		InetAddress host = client.discoverHost(udpPort, 2000);
+		InetAddress host = client.discoverHost(broadcastServer.getUdpPort(), 2000);
 		if (host == null) {
-			stopEndPoints();
+			extension.stopEndPoints();
 			fail("No servers found.");
 			return;
 		}
 
-		startEndPoint(client);
-		client.connect(2000, host, tcpPort);
+		extension.startEndPoint(client);
+		client.connect(2000, host, server.getTcpPort());
 		client.stop();
 
-		waitForThreads();
+		extension.waitForThreads();
 	}
 
 	public static class DiscoveryResponsePacket {

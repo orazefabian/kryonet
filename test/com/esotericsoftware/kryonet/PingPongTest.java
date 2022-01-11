@@ -20,15 +20,21 @@
 package com.esotericsoftware.kryonet;
 
 import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.minlog.Log;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.IOException;
 import java.util.Arrays;
 
-public class PingPongTest extends KryoNetTestCase {
+@ExtendWith(KryonetExtension.class)
+public class PingPongTest {
 	String fail;
 
-	public void testPingPong() throws IOException {
+	@Test
+	public void testPingPong(KryonetExtension.Kryonet extension) throws IOException {
 		fail = null;
+		Log.set(Log.LEVEL_DEBUG);
 
 		final Data dataTCP = new Data();
 		populateData(dataTCP, true);
@@ -37,8 +43,9 @@ public class PingPongTest extends KryoNetTestCase {
 
 		final Server server = new Server(16384, 8192);
 		register(server.getKryo());
-		startEndPoint(server);
-		server.bind(tcpPort, udpPort);
+		extension.startEndPoint(server);
+		server.bind(extension.tcpPort, extension.udpPort);
+
 		server.addListener(new Listener() {
 			public void connected(Connection connection) {
 				connection.sendTCP(dataTCP);
@@ -69,7 +76,7 @@ public class PingPongTest extends KryoNetTestCase {
 
 		final Client client = new Client(16384, 8192);
 		register(client.getKryo());
-		startEndPoint(client);
+		extension.startEndPoint(client);
 		client.addListener(new Listener() {
 			public void received(Connection connection, Object object) {
 				if (object instanceof Data) {
@@ -91,9 +98,9 @@ public class PingPongTest extends KryoNetTestCase {
 			}
 		});
 
-		client.connect(5000, host, tcpPort, udpPort);
+		client.connect(5000, extension.host, server.getTcpPort(), server.getUdpPort());
 
-		waitForThreads(5000);
+		extension.waitForThreads(5000);
 	}
 
 	private void populateData(Data data, boolean isTCP) {

@@ -19,18 +19,25 @@
 
 package com.esotericsoftware.kryonet;
 
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+
 import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class ReconnectTest extends KryoNetTestCase {
-	public void testReconnect() throws IOException {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+@ExtendWith(KryonetExtension.class)
+public class ReconnectTest {
+	@Test
+	public void testReconnect(KryonetExtension.Kryonet extension) throws IOException {
 		final Timer timer = new Timer();
 
 		final Server server = new Server();
-		startEndPoint(server);
-		server.bind(tcpPort);
+		extension.startEndPoint(server);
+		server.bind(extension.tcpPort);
 		server.addListener(new Listener() {
 			public void connected(final Connection connection) {
 				timer.schedule(new TimerTask() {
@@ -46,11 +53,11 @@ public class ReconnectTest extends KryoNetTestCase {
 
 		final AtomicInteger reconnetCount = new AtomicInteger();
 		final Client client = new Client();
-		startEndPoint(client);
+		extension.startEndPoint(client);
 		client.addListener(new Listener() {
 			public void disconnected(Connection connection) {
 				if (reconnetCount.getAndIncrement() == 2) {
-					stopEndPoints();
+					extension.stopEndPoints();
 					return;
 				}
 				new Thread() {
@@ -65,9 +72,9 @@ public class ReconnectTest extends KryoNetTestCase {
 				}.start();
 			}
 		});
-		client.connect(5000, host, tcpPort);
+		client.connect(5000, extension.host, server.getTcpPort());
 
-		waitForThreads(10000);
+		extension.waitForThreads(10000);
 		assertEquals(3, reconnetCount.getAndIncrement());
 	}
 }

@@ -21,10 +21,18 @@ package com.esotericsoftware.kryonet.rmi;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryonet.*;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.IOException;
 
-public class RmiTest extends KryoNetTestCase {
+import static org.junit.jupiter.api.Assertions.*;
+
+@ExtendWith(KryonetExtension.class)
+@Disabled("Modern Java versions don't allow this type of serialization, so the code will not work anyway")
+public class RmiTest {
+
 	static public void runTest(final Connection connection, final int id, final float other) {
 		new Thread() {
 			public void run() {
@@ -126,13 +134,14 @@ public class RmiTest extends KryoNetTestCase {
 	 * In this test both the client and server have an ObjectSpace that contains a TestObject. When the client connects, the same
 	 * test is run on both the client and server. The test excersizes a number of remote method calls and other features.
 	 */
-	public void testRMI() throws IOException {
+	@Test
+	public void testRMI(KryonetExtension.Kryonet extension) throws IOException {
 		Server server = new Server();
 		Kryo serverKryo = server.getKryo();
 		register(serverKryo);
 
-		startEndPoint(server);
-		server.bind(tcpPort, udpPort);
+		extension.startEndPoint(server);
+		server.bind(extension.tcpPort, extension.udpPort);
 
 		final TestObjectImpl serverTestObject = new TestObjectImpl(4321);
 
@@ -151,7 +160,7 @@ public class RmiTest extends KryoNetTestCase {
 				System.out.println(serverTestObject.value);
 				System.out.println(((TestObjectImpl) m.testObject).value);
 				assertEquals(4321f, m.testObject.other());
-				stopEndPoints(2000);
+				extension.stopEndPoints(2000);
 			}
 		});
 
@@ -164,7 +173,7 @@ public class RmiTest extends KryoNetTestCase {
 		final TestObjectImpl clientTestObject = new TestObjectImpl(1234);
 		clientObjectSpace.register(12, clientTestObject);
 
-		startEndPoint(client);
+		extension.startEndPoint(client);
 		client.addListener(new Listener() {
 			public void connected(final Connection connection) {
 				runTest(connection, 42, 4321);
@@ -176,21 +185,22 @@ public class RmiTest extends KryoNetTestCase {
 				System.out.println(clientTestObject.value);
 				System.out.println(((TestObjectImpl) m.testObject).value);
 				assertEquals(1234f, m.testObject.other());
-				stopEndPoints(2000);
+				extension.stopEndPoints(2000);
 			}
 		});
-		client.connect(5000, host, tcpPort, udpPort);
+		client.connect(5000, extension.host, server.getTcpPort(), server.getUdpPort());
 
-		waitForThreads();
+		extension.waitForThreads();
 	}
 
-	public void testMany() throws IOException {
+	@Test
+	public void testMany(KryonetExtension.Kryonet extension) throws IOException {
 		Server server = new Server();
 		Kryo serverKryo = server.getKryo();
 		register(serverKryo);
 
-		startEndPoint(server);
-		server.bind(tcpPort);
+		extension.startEndPoint(server);
+		server.bind(extension.tcpPort);
 
 		final TestObjectImpl serverTestObject = new TestObjectImpl(4321);
 
@@ -205,7 +215,7 @@ public class RmiTest extends KryoNetTestCase {
 			public void received(Connection connection, Object object) {
 				if (object instanceof MessageWithTestObject) {
 					assertEquals(256 + 512 + 1024, serverTestObject.moos);
-					stopEndPoints(2000);
+					extension.stopEndPoints(2000);
 				}
 			}
 		});
@@ -215,7 +225,7 @@ public class RmiTest extends KryoNetTestCase {
 		Client client = new Client();
 		register(client.getKryo());
 
-		startEndPoint(client);
+		extension.startEndPoint(client);
 		client.addListener(new Listener() {
 			public void connected(final Connection connection) {
 				new Thread() {
@@ -247,9 +257,9 @@ public class RmiTest extends KryoNetTestCase {
 				}.start();
 			}
 		});
-		client.connect(5000, host, tcpPort);
+		client.connect(5000, extension.host, server.getTcpPort());
 
-		waitForThreads();
+		extension.waitForThreads();
 	}
 
 	public interface TestObject {

@@ -20,19 +20,24 @@
 package com.esotericsoftware.kryonet;
 
 import com.esotericsoftware.kryonet.FrameworkMessage.Ping;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.IOException;
 
-public class PingTest extends KryoNetTestCase {
-	public void testPing() throws IOException {
+@ExtendWith(KryonetExtension.class)
+public class PingTest {
+
+	@Test
+	public void testPing(KryonetExtension.Kryonet extension) throws IOException {
 		final Server server = new Server();
-		startEndPoint(server);
-		server.bind(tcpPort);
+		extension.startEndPoint(server);
+		server.bind(extension.tcpPort);
 
 		// ----
 
 		final Client client = new Client();
-		startEndPoint(client);
+		extension.startEndPoint(client);
 		client.addListener(new Listener() {
 			public void connected(Connection connection) {
 				client.updateReturnTripTime();
@@ -46,8 +51,8 @@ public class PingTest extends KryoNetTestCase {
 				}
 			}
 		});
-		client.connect(5000, host, tcpPort);
+		client.connect(5000, extension.host, server.getTcpPort());
 
-		waitForThreads(5000);
+		extension.waitForThreads(5000);
 	}
 }

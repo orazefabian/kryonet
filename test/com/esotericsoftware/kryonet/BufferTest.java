@@ -20,23 +20,27 @@
 package com.esotericsoftware.kryonet;
 
 import com.esotericsoftware.kryo.Kryo;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class BufferTest extends KryoNetTestCase {
+@ExtendWith(KryonetExtension.class)
+public class BufferTest {
 	AtomicInteger received = new AtomicInteger();
 	AtomicInteger receivedBytes = new AtomicInteger();
 
-	public void testManyLargeMessages() throws IOException {
+	@Test
+	public void testManyLargeMessages(KryonetExtension.Kryonet extension) throws IOException {
 		final int messageCount = 1024;
 		int objectBufferSize = 10250;
 		int writeBufferSize = 10250 * messageCount;
 
 		Server server = new Server(writeBufferSize, objectBufferSize);
-		startEndPoint(server);
+		extension.startEndPoint(server);
 		register(server.getKryo());
-		server.bind(tcpPort);
+		server.bind(extension.tcpPort);
 
 		server.addListener(new Listener() {
 			final AtomicInteger received = new AtomicInteger();
@@ -60,9 +64,9 @@ public class BufferTest extends KryoNetTestCase {
 		});
 
 		final Client client = new Client(writeBufferSize, objectBufferSize);
-		startEndPoint(client);
+		extension.startEndPoint(client);
 		register(client.getKryo());
-		client.connect(5000, host, tcpPort);
+		client.connect(5000, extension.host, server.getTcpPort());
 
 		client.addListener(new Listener() {
 			final AtomicInteger received = new AtomicInteger();
@@ -75,7 +79,7 @@ public class BufferTest extends KryoNetTestCase {
 					if (count == messageCount) {
 						System.out.println("Client received all " + messageCount + " messages!");
 						System.out.println("Client received and sent " + receivedBytes.get() + " bytes.");
-						stopEndPoints();
+						extension.stopEndPoints();
 					}
 				}
 			}
@@ -88,7 +92,7 @@ public class BufferTest extends KryoNetTestCase {
 		}
 		System.out.println("Client has queued " + messageCount + " messages.");
 
-		waitForThreads(5000);
+		extension.waitForThreads(5000);
 	}
 
 	private void register(Kryo kryo) {

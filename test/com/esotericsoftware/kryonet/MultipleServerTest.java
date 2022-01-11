@@ -19,35 +19,42 @@
 
 package com.esotericsoftware.kryonet;
 
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class MultipleServerTest extends KryoNetTestCase {
+import static org.junit.jupiter.api.Assertions.fail;
+
+@ExtendWith(KryonetExtension.class)
+public class MultipleServerTest {
 	AtomicInteger received = new AtomicInteger();
 
-	public void testMultipleThreads() throws IOException {
+	@Test
+	public void testMultipleThreads(KryonetExtension.Kryonet extension) throws IOException {
 		final Server server1 = new Server(16384, 8192);
 		server1.getKryo().register(String[].class);
-		startEndPoint(server1);
-		server1.bind(tcpPort, udpPort);
+		extension.startEndPoint(server1);
+		server1.bind(extension.tcpPort, extension.udpPort);
 		server1.addListener(new Listener() {
 			public void received(Connection connection, Object object) {
 				if (object instanceof String) {
 					if (!object.equals("client1")) fail();
-					if (received.incrementAndGet() == 2) stopEndPoints();
+					if (received.incrementAndGet() == 2) extension.stopEndPoints();
 				}
 			}
 		});
 
 		final Server server2 = new Server(16384, 8192);
 		server2.getKryo().register(String[].class);
-		startEndPoint(server2);
-		server2.bind(tcpPort + 1, udpPort + 1);
+		extension.startEndPoint(server2);
+		server2.bind(extension.tcpPort, extension.udpPort);
 		server2.addListener(new Listener() {
 			public void received(Connection connection, Object object) {
 				if (object instanceof String) {
 					if (!object.equals("client2")) fail();
-					if (received.incrementAndGet() == 2) stopEndPoints();
+					if (received.incrementAndGet() == 2) extension.stopEndPoints();
 				}
 			}
 		});
@@ -56,24 +63,24 @@ public class MultipleServerTest extends KryoNetTestCase {
 
 		Client client1 = new Client(16384, 8192);
 		client1.getKryo().register(String[].class);
-		startEndPoint(client1);
+		extension.startEndPoint(client1);
 		client1.addListener(new Listener() {
 			public void connected(Connection connection) {
 				connection.sendTCP("client1");
 			}
 		});
-		client1.connect(5000, host, tcpPort, udpPort);
+		client1.connect(5000, extension.host, server1.getTcpPort(), server1.getUdpPort());
 
 		Client client2 = new Client(16384, 8192);
 		client2.getKryo().register(String[].class);
-		startEndPoint(client2);
+		extension.startEndPoint(client2);
 		client2.addListener(new Listener() {
 			public void connected(Connection connection) {
 				connection.sendTCP("client2");
 			}
 		});
-		client2.connect(5000, host, tcpPort + 1, udpPort + 1);
+		client2.connect(5000, extension.host, server2.getTcpPort(), server2.getUdpPort());
 
-		waitForThreads(5000);
+		extension.waitForThreads(5000);
 	}
 }

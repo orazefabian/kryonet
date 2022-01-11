@@ -97,7 +97,10 @@ public class Connection {
 	 * @see Kryo#register(Class, com.esotericsoftware.kryo.Serializer)
 	 */
 	public int sendTCP(Object object) {
-		if (object == null) throw new IllegalArgumentException("object cannot be null.");
+		if (object == null) {
+			throw new IllegalArgumentException("object cannot be null.");
+		}
+
 		try {
 			int length = tcp.send(this, object);
 			if (length == 0) {

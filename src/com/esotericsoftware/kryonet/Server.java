@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static com.esotericsoftware.minlog.Log.*;
 
@@ -45,33 +46,38 @@ public class Server implements EndPoint {
 	private final int writeBufferSize, objectBufferSize;
 	private final Selector selector;
 	private final IntMap<Connection> pendingConnections = new IntMap<>();
-	private final Object listenerLock = new Object();
 	private final Object updateLock = new Object();
-	Listener[] listeners = {};
+	private final CopyOnWriteArrayList<Listener> listeners = new CopyOnWriteArrayList<>();
 	private int emptySelects;
 	private ServerSocketChannel serverChannel;
 	private UdpConnection udp;
 	private Connection[] connections = {};
+
 	private final Listener dispatchListener = new Listener() {
 		public void connected(Connection connection) {
-			Listener[] listeners = Server.this.listeners;
-			for (Listener listener : listeners) listener.connected(connection);
+			for (Listener listener : listeners) {
+				listener.connected(connection);
+			}
 		}
 
 		public void disconnected(Connection connection) {
 			removeConnection(connection);
-			Listener[] listeners = Server.this.listeners;
-			for (Listener listener : listeners) listener.disconnected(connection);
+
+			for (Listener listener : listeners) {
+				listener.disconnected(connection);
+			}
 		}
 
 		public void received(Connection connection, Object object) {
-			Listener[] listeners = Server.this.listeners;
-			for (Listener listener : listeners) listener.received(connection, object);
+			for (Listener listener : listeners) {
+				listener.received(connection, object);
+			}
 		}
 
 		public void idle(Connection connection) {
-			Listener[] listeners = Server.this.listeners;
-			for (Listener listener : listeners) listener.idle(connection);
+			for (Listener listener : listeners) {
+				listener.idle(connection);
+			}
 		}
 	};
 	private int nextConnectionID = 1;
@@ -176,6 +182,14 @@ public class Server implements EndPoint {
 			}
 		}
 		if (INFO) info("kryonet", "Server opened.");
+	}
+
+	public int getTcpPort () {
+		return serverChannel.socket().getLocalPort();
+	}
+
+	public int getUdpPort() {
+		return udp.datagramChannel.socket().getLocalPort();
 	}
 
 	/**
@@ -522,34 +536,25 @@ public class Server implements EndPoint {
 	}
 
 	public void addListener(Listener listener) {
-		if (listener == null) throw new IllegalArgumentException("listener cannot be null.");
-		synchronized (listenerLock) {
-			Listener[] listeners = this.listeners;
-			int n = listeners.length;
-			for (Listener value : listeners) if (listener == value) return;
-			Listener[] newListeners = new Listener[n + 1];
-			newListeners[0] = listener;
-			System.arraycopy(listeners, 0, newListeners, 1, n);
-			this.listeners = newListeners;
+		if (listener == null) {
+			throw new IllegalArgumentException("listener cannot be null.");
 		}
+
+		listeners.add(listener);
+
 		if (TRACE) trace("kryonet", "Server listener added: " + listener.getClass().getName());
 	}
 
 	public void removeListener(Listener listener) {
-		if (listener == null) throw new IllegalArgumentException("listener cannot be null.");
-		synchronized (listenerLock) {
-			Listener[] listeners = this.listeners;
-			int n = listeners.length;
-			Listener[] newListeners = new Listener[n - 1];
-			for (int i = 0, ii = 0; i < n; i++) {
-				Listener copyListener = listeners[i];
-				if (listener == copyListener) continue;
-				if (ii == n - 1) return;
-				newListeners[ii++] = copyListener;
-			}
-			this.listeners = newListeners;
+		if (listener == null) {
+			throw new IllegalArgumentException("listener cannot be null.");
 		}
-		if (TRACE) trace("kryonet", "Server listener removed: " + listener.getClass().getName());
+
+		listeners.remove(listener);
+
+		if (TRACE) {
+			trace("kryonet", "Server listener removed: " + listener.getClass().getName());
+		}
 	}
 
 	/**

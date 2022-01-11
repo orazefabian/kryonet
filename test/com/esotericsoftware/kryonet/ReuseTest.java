@@ -19,15 +19,22 @@
 
 package com.esotericsoftware.kryonet;
 
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class ReuseTest extends KryoNetTestCase {
-	public void testPingPong() throws IOException {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+@ExtendWith(KryonetExtension.class)
+public class ReuseTest {
+	@Test
+	public void testPingPong(KryonetExtension.Kryonet extension) throws IOException, InterruptedException {
 		final AtomicInteger stringCount = new AtomicInteger(0);
 
 		final Server server = new Server();
-		startEndPoint(server);
+		extension.startEndPoint(server);
 		server.addListener(new Listener() {
 			public void connected(Connection connection) {
 				connection.sendTCP("TCP from server");
@@ -45,7 +52,7 @@ public class ReuseTest extends KryoNetTestCase {
 		// ----
 
 		final Client client = new Client();
-		startEndPoint(client);
+		extension.startEndPoint(client);
 		client.addListener(new Listener() {
 			public void connected(Connection connection) {
 				connection.sendTCP("TCP from client");
@@ -60,19 +67,19 @@ public class ReuseTest extends KryoNetTestCase {
 			}
 		});
 
-		int count = 5;
-		for (int i = 0; i < count; i++) {
-			server.bind(tcpPort, udpPort);
-			client.connect(5000, host, tcpPort, udpPort);
-			try {
-				Thread.sleep(250);
-			} catch (InterruptedException ex) {
-			}
-			server.close();
-		}
-		assertEquals(count * 2 * 2, stringCount.get());
+		final int count = 5;
 
-		stopEndPoints();
-		waitForThreads(10000);
+		try {
+			for (int i = 0; i < count; i++) {
+				server.bind(extension.tcpPort, extension.udpPort);
+				client.connect(5000, extension.host, server.getTcpPort(), server.getUdpPort());
+				Thread.sleep(250);
+				server.close();
+			}
+			assertEquals(count * 2 * 2, stringCount.get());
+		} finally {
+			extension.stopEndPoints();
+			extension.waitForThreads(10000);
+		}
 	}
 }

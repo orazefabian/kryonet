@@ -23,10 +23,15 @@ import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryonet.*;
 import com.esotericsoftware.kryonet.Listener.ThreadedListener;
 import com.esotericsoftware.kryonet.rmi.ObjectSpace.RemoteObjectSerializer;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.IOException;
 
-public class RmiSendObjectTest extends KryoNetTestCase {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+@ExtendWith(KryonetExtension.class)
+public class RmiSendObjectTest {
 	/**
 	 * Registers the same classes in the same order on both the client and server.
 	 */
@@ -40,7 +45,8 @@ public class RmiSendObjectTest extends KryoNetTestCase {
 	 * In this test the server has two objects in an object space. The client uses the first remote object to get the second remote
 	 * object.
 	 */
-	public void testRMI() throws IOException {
+	@Test
+	public void testRMI(KryonetExtension.Kryonet extension) throws IOException {
 		Server server = new Server();
 		Kryo serverKryo = server.getKryo();
 		register(serverKryo);
@@ -50,8 +56,8 @@ public class RmiSendObjectTest extends KryoNetTestCase {
 		int otherObjectID = serverKryo.getRegistration(OtherObject.class).getId();
 		serverKryo.register(OtherObjectImpl.class, new RemoteObjectSerializer(), otherObjectID);
 
-		startEndPoint(server);
-		server.bind(tcpPort);
+		extension.startEndPoint(server);
+		server.bind(extension.tcpPort);
 
 		// TestObjectImpl has a reference to an OtherObjectImpl.
 		final TestObjectImpl serverTestObject = new TestObjectImpl();
@@ -70,7 +76,7 @@ public class RmiSendObjectTest extends KryoNetTestCase {
 
 			public void received(Connection connection, Object object) {
 				// The test is complete when the client sends the OtherObject instance.
-				if (object == serverTestObject.getOtherObject()) stopEndPoints();
+				if (object == serverTestObject.getOtherObject()) extension.stopEndPoints();
 			}
 		});
 
@@ -78,7 +84,7 @@ public class RmiSendObjectTest extends KryoNetTestCase {
 
 		Client client = new Client();
 		register(client.getKryo());
-		startEndPoint(client);
+		extension.startEndPoint(client);
 
 		// The ThreadedListener means the network thread won't be blocked when waiting for RMI responses.
 		client.addListener(new ThreadedListener(new Listener() {
@@ -94,9 +100,9 @@ public class RmiSendObjectTest extends KryoNetTestCase {
 				connection.sendTCP(otherObject);
 			}
 		}));
-		client.connect(5000, host, tcpPort);
+		client.connect(5000, extension.host, server.getTcpPort());
 
-		waitForThreads();
+		extension.waitForThreads();
 	}
 
 	public interface TestObject {
