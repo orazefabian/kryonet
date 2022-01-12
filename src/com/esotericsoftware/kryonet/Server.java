@@ -261,33 +261,37 @@ public class Server implements EndPoint {
             if (fromConnection != null) { // Must be a TCP read or write operation.
                 handleConnectionWithOpsSet(fromConnection, operationsSet);
             } else if (checkIfServerChannelIsInAcceptOperation(operationsSet)) {
-                checkServerChannel();
+                checkServerChannelAndAcceptOps();
             } else if (udp == null) { // Must be a UDP read operation.
                 selectionKey.channel().close();
+            } else {
+                fromConnection = updateConnectionBasedOnUDPAddress(fromConnection);
             }
-
-            InetSocketAddress fromAddress = null;
-            Object object = null;
-            try {
-                fromAddress = udp.readFromAddress();
-                if (fromAddress == null) return;
-                fromConnection = getConnectionCorrespondingToAddress(fromConnection, fromAddress);
-                object = udp.readObject(fromConnection);
-                if (checkForObjectType(fromConnection, fromAddress, object)) return;
-            } catch (IOException ex) {
-                if (WARN) warn("kryonet", "Error reading UDP data.", ex);
-                return;
-            } catch (KryoNetException ex) {
-                handleKryoNetExceptionFromConnection(fromConnection, fromAddress, ex);
-                return;
-            }
-            if (DEBUG) debug("kryonet", "Ignoring UDP from unregistered address: " + fromAddress);
         } catch (CancelledKeyException ex) {
             handleCancelledKeyExceptionFromConnection(selectionKey, fromConnection);
         }
     }
 
-    private void checkServerChannel() {
+    private Connection updateConnectionBasedOnUDPAddress(Connection fromConnection) {
+        InetSocketAddress fromAddress = null;
+        Object object;
+        try {
+            fromAddress = udp.readFromAddress();
+            if (fromAddress != null) {
+                fromConnection = getConnectionCorrespondingToAddress(fromConnection, fromAddress);
+                object = udp.readObject(fromConnection);
+                checkForObjectType(fromConnection, fromAddress, object);
+            }
+        } catch (IOException ex) {
+            if (WARN) warn("kryonet", "Error reading UDP data.", ex);
+        } catch (KryoNetException ex) {
+            handleKryoNetExceptionFromConnection(fromConnection, fromAddress, ex);
+        }
+        if (DEBUG) debug("kryonet", "Ignoring UDP from unregistered address: " + fromAddress);
+        return fromConnection;
+    }
+
+    private void checkServerChannelAndAcceptOps() {
         if (serverChannel != null) {
             acceptSocketChannelOperation();
         }
