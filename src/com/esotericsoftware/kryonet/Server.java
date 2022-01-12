@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.*;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -346,48 +345,57 @@ public class Server implements EndPoint {
 
     private void checkForObjectType(Connection fromConnection, InetSocketAddress fromAddress, Object object) {
         if (object instanceof FrameworkMessage) {
-            if (object instanceof RegisterUDP) {
-                // Store the fromAddress on the connection and reply over TCP with a RegisterUDP to indicate success.
-                int fromConnectionID = ((RegisterUDP) object).connectionID;
-                Connection connection = pendingConnections.remove(fromConnectionID);
-                if (connection != null) {
-                    if (connection.udpRemoteAddress != null) return;
-                    connection.udpRemoteAddress = fromAddress;
-                    addConnection(connection);
-                    connection.sendTCP(new RegisterUDP());
-                    if (DEBUG) debug("kryonet",
-                            "Port " + udp.datagramChannel.socket().getLocalPort() + "/UDP connected to: " + fromAddress);
-                    connection.notifyConnected();
-                    return;
-                }
-                if (DEBUG)
-                    debug("kryonet", "Ignoring incoming RegisterUDP with invalid connection ID: " + fromConnectionID);
-                return;
-            }
-            if (object instanceof DiscoverHost) {
-                try {
-                    boolean responseSent = discoveryHandler.onDiscoverHost(udp.datagramChannel, fromAddress,
-                            serialization);
-                    if (DEBUG && responseSent)
-                        debug("kryonet", "Responded to host discovery from: " + fromAddress);
-                } catch (IOException ex) {
-                    if (WARN)
-                        warn("kryonet", "Error replying to host discovery from: " + fromAddress, ex);
-                }
-                return;
-            }
+            processConnectionBasedOnObject(fromAddress, object);
+        } else if (fromConnection != null) {
+            notifyConnectionOfReceivedObject(fromConnection, object);
         }
+    }
 
-        if (fromConnection != null) {
-            if (DEBUG) {
-                String objectString = object == null ? "null" : object.getClass().getSimpleName();
-                if (object instanceof FrameworkMessage) {
-                    if (TRACE) trace("kryonet", fromConnection + " received UDP: " + objectString);
-                } else
-                    debug("kryonet", fromConnection + " received UDP: " + objectString);
-            }
-            fromConnection.notifyReceived(object);
+    private void notifyConnectionOfReceivedObject(Connection fromConnection, Object object) {
+        if (DEBUG) {
+            String objectString = object == null ? "null" : object.getClass().getSimpleName();
+            if (object instanceof FrameworkMessage) {
+                if (TRACE) trace("kryonet", fromConnection + " received UDP: " + objectString);
+            } else
+                debug("kryonet", fromConnection + " received UDP: " + objectString);
         }
+        fromConnection.notifyReceived(object);
+    }
+
+    private void processConnectionBasedOnObject(InetSocketAddress fromAddress, Object object) {
+        if (object instanceof RegisterUDP) {
+            processRegisterUDPObject(fromAddress, (RegisterUDP) object);
+        } else if (object instanceof DiscoverHost) {
+            processDiscoverHostObject(fromAddress);
+        }
+    }
+
+    private void processDiscoverHostObject(InetSocketAddress fromAddress) {
+        try {
+            boolean responseSent = discoveryHandler.onDiscoverHost(udp.datagramChannel, fromAddress,
+                    serialization);
+            if (DEBUG && responseSent)
+                debug("kryonet", "Responded to host discovery from: " + fromAddress);
+        } catch (IOException ex) {
+            if (WARN)
+                warn("kryonet", "Error replying to host discovery from: " + fromAddress, ex);
+        }
+    }
+
+    private void processRegisterUDPObject(InetSocketAddress fromAddress, RegisterUDP object) {
+        // Store the fromAddress on the connection and reply over TCP with a RegisterUDP to indicate success.
+        int fromConnectionID = object.connectionID;
+        Connection connection = pendingConnections.remove(fromConnectionID);
+        if (connection != null && connection.udpRemoteAddress == null) {
+            connection.udpRemoteAddress = fromAddress;
+            addConnection(connection);
+            connection.sendTCP(new RegisterUDP());
+            if (DEBUG) debug("kryonet",
+                    "Port " + udp.datagramChannel.socket().getLocalPort() + "/UDP connected to: " + fromAddress);
+            connection.notifyConnected();
+        }
+        if (DEBUG)
+            debug("kryonet", "Ignoring incoming RegisterUDP with invalid connection ID: " + fromConnectionID);
     }
 
     private void checkIfConnectionIsInWriteOperation(Connection fromConnection, int operationsSet) {
