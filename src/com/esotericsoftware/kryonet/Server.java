@@ -51,7 +51,7 @@ public class Server implements EndPoint {
     private int emptySelects;
     private ServerSocketChannel serverChannel;
     private UdpConnection udp;
-    private Connection[] connections = {};
+    private ArrayList<Connection> connections;
 
     private final Listener dispatchListener = new Listener() {
         public void connected(Connection connection) {
@@ -115,11 +115,9 @@ public class Server implements EndPoint {
     public Server(int writeBufferSize, int objectBufferSize, Serialization serialization) {
         this.writeBufferSize = writeBufferSize;
         this.objectBufferSize = objectBufferSize;
-
         this.serialization = serialization;
-
         this.discoveryHandler = ServerDiscoveryHandler.DEFAULT;
-
+        this.connections = new ArrayList<>();
         try {
             selector = Selector.open();
         } catch (IOException ex) {
@@ -208,7 +206,7 @@ public class Server implements EndPoint {
             emptySelects++;
             checkEmptySelects(startTime);
         } else {
-            performDataUpdate();
+            performDataUpdateOnSelector();
         }
         long endTime = System.currentTimeMillis();
         for (Connection connection : connections) {
@@ -237,7 +235,7 @@ public class Server implements EndPoint {
     }
 
 
-    private void performDataUpdate() throws IOException {
+    private void performDataUpdateOnSelector() throws IOException {
         emptySelects = 0;
         Set<SelectionKey> keys = selector.selectedKeys();
         synchronized (keys) {
@@ -346,25 +344,25 @@ public class Server implements EndPoint {
         }
     }
 
-    private boolean checkForObjectType(Connection fromConnection, InetSocketAddress fromAddress, Object object) {
+    private void checkForObjectType(Connection fromConnection, InetSocketAddress fromAddress, Object object) {
         if (object instanceof FrameworkMessage) {
             if (object instanceof RegisterUDP) {
                 // Store the fromAddress on the connection and reply over TCP with a RegisterUDP to indicate success.
                 int fromConnectionID = ((RegisterUDP) object).connectionID;
                 Connection connection = pendingConnections.remove(fromConnectionID);
                 if (connection != null) {
-                    if (connection.udpRemoteAddress != null) return true;
+                    if (connection.udpRemoteAddress != null) return;
                     connection.udpRemoteAddress = fromAddress;
                     addConnection(connection);
                     connection.sendTCP(new RegisterUDP());
                     if (DEBUG) debug("kryonet",
                             "Port " + udp.datagramChannel.socket().getLocalPort() + "/UDP connected to: " + fromAddress);
                     connection.notifyConnected();
-                    return true;
+                    return;
                 }
                 if (DEBUG)
                     debug("kryonet", "Ignoring incoming RegisterUDP with invalid connection ID: " + fromConnectionID);
-                return true;
+                return;
             }
             if (object instanceof DiscoverHost) {
                 try {
@@ -376,7 +374,7 @@ public class Server implements EndPoint {
                     if (WARN)
                         warn("kryonet", "Error replying to host discovery from: " + fromAddress, ex);
                 }
-                return true;
+                return;
             }
         }
 
@@ -389,9 +387,7 @@ public class Server implements EndPoint {
                     debug("kryonet", fromConnection + " received UDP: " + objectString);
             }
             fromConnection.notifyReceived(object);
-            return true;
         }
-        return false;
     }
 
     private void checkIfConnectionIsInWriteOperation(Connection fromConnection, int operationsSet) {
@@ -526,16 +522,13 @@ public class Server implements EndPoint {
     }
 
     private void addConnection(Connection connection) {
-        Connection[] newConnections = new Connection[connections.length + 1];
-        newConnections[0] = connection;
-        System.arraycopy(connections, 0, newConnections, 1, connections.length);
-        connections = newConnections;
+        connections.add(connection);
     }
 
     void removeConnection(Connection connection) {
-        ArrayList<Connection> temp = new ArrayList<>(Arrays.asList(connections));
+        ArrayList<Connection> temp = new ArrayList<>(connections);
         temp.remove(connection);
-        connections = temp.toArray(new Connection[0]);
+        connections = temp;
 
         pendingConnections.remove(connection.id);
     }
@@ -610,9 +603,9 @@ public class Server implements EndPoint {
      * Closes all open connections and the server port(s).
      */
     public void close() {
-        if (INFO && connections.length > 0) info("kryonet", "Closing server connections...");
+        if (INFO && connections.size() > 0) info("kryonet", "Closing server connections...");
         for (Connection connection : connections) connection.close();
-        connections = new Connection[0];
+        connections = new ArrayList<>();
 
         ServerSocketChannel serverChannel = this.serverChannel;
         if (serverChannel != null) {
@@ -655,7 +648,7 @@ public class Server implements EndPoint {
     /**
      * Returns the current connections. The array returned should not be modified.
      */
-    public Connection[] getConnections() {
+    public ArrayList<Connection> getConnections() {
         return connections;
     }
 }

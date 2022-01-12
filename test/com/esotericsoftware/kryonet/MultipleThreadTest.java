@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -80,10 +81,10 @@ public class MultipleThreadTest {
 		for (int i = 0; i < threads; i++) {
 			new Thread() {
 				public void run() {
-					Connection[] connections = server.getConnections();
+					ArrayList<Connection> connections = server.getConnections();
 					for (int i = 0; i < messageCount; i++) {
-						for (int ii = 0, n = connections.length; ii < n; ii++)
-							connections[ii].sendTCP("message" + i);
+						for (int ii = 0, n = connections.size(); ii < n; ii++)
+							connections.get(ii).sendTCP("message" + i);
 						try {
 							Thread.sleep(sleepMillis);
 						} catch (InterruptedException ignored) {
