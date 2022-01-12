@@ -30,6 +30,7 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static com.esotericsoftware.minlog.Log.*;
 
@@ -51,7 +52,7 @@ public class Connection {
 	volatile boolean isConnected;
 	@CheckForNull volatile KryoNetException lastProtocolError;
 	private String name;
-	@Nonnull private Listener[] listeners = {};
+	@Nonnull private final CopyOnWriteArrayList<Listener> listeners = new CopyOnWriteArrayList<>();
 	private int lastPingID;
 	private long lastPingSendTime;
 	private int returnTripTime;
@@ -233,15 +234,9 @@ public class Connection {
 		if (listener == null) {
 			throw new IllegalArgumentException("listener cannot be null.");
 		}
-		synchronized (listenerLock) {
-			Listener[] listeners = this.listeners;
-			int n = listeners.length;
-			for (Listener value : listeners) if (listener == value) return;
-			Listener[] newListeners = new Listener[n + 1];
-			newListeners[0] = listener;
-			System.arraycopy(listeners, 0, newListeners, 1, n);
-			this.listeners = newListeners;
-		}
+
+		listeners.add(listener);
+
 		if (TRACE) trace("kryonet", "Connection listener added: " + listener.getClass().getName());
 	}
 
@@ -249,19 +244,9 @@ public class Connection {
 		if (listener == null) {
 			throw new IllegalArgumentException("listener cannot be null.");
 		}
-		synchronized (listenerLock) {
-			Listener[] listeners = this.listeners;
-			int n = listeners.length;
-			if (n == 0) return;
-			Listener[] newListeners = new Listener[n - 1];
-			for (int i = 0, ii = 0; i < n; i++) {
-				Listener copyListener = listeners[i];
-				if (listener == copyListener) continue;
-				if (ii == n - 1) return;
-				newListeners[ii++] = copyListener;
-			}
-			this.listeners = newListeners;
-		}
+
+		listeners.remove(listener);
+
 		if (TRACE) trace("kryonet", "Connection listener removed: " + listener.getClass().getName());
 	}
 
@@ -277,20 +262,20 @@ public class Connection {
 				}
 			}
 		}
-		final Listener[] listeners = this.listeners;
-		for (Listener listener : listeners) listener.connected(this);
+		for (Listener listener : this.listeners) listener.connected(this);
 	}
 
 	void notifyDisconnected() {
-		Listener[] listeners = this.listeners;
-		for (Listener listener : listeners) listener.disconnected(this);
+		for (Listener listener : this.listeners) listener.disconnected(this);
 	}
 
 	void notifyIdle() {
-		Listener[] listeners = this.listeners;
-		for (Listener listener : listeners) {
+		for (Listener listener : this.listeners) {
 			listener.idle(this);
-			if (!isIdle()) break;
+
+			if (!isIdle()) {
+				break;
+			}
 		}
 	}
 
@@ -307,8 +292,9 @@ public class Connection {
 				sendTCP(ping);
 			}
 		}
-		Listener[] listeners = this.listeners;
-		for (Listener listener : listeners) listener.received(this, object);
+		for (Listener listener : this.listeners) {
+			listener.received(this, object);
+		}
 	}
 
 	/**
