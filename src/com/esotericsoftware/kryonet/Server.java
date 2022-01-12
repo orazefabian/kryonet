@@ -203,9 +203,10 @@ public class Server implements EndPoint {
 		synchronized (updateLock) { // Blocks to avoid a select while the selector is used to bind the server connection.
 		}
 		long startTime = System.currentTimeMillis();
-		int select = getSelectFromSelector(timeout);
+		int select = getNumberOfKeysFromSelector(timeout);
 		if (select == 0) {
-			increaseAndCheckEmptySelects(startTime);
+			emptySelects++;
+			checkEmptySelects(startTime);
 		} else {
 			performDataUpdate();
 		}
@@ -215,7 +216,7 @@ public class Server implements EndPoint {
 		}
 	}
 
-	private int getSelectFromSelector(int timeout) throws IOException {
+	private int getNumberOfKeysFromSelector(int timeout) throws IOException {
 		int select;
 		if (timeout > 0) {
 			select = selector.select(timeout);
@@ -235,11 +236,11 @@ public class Server implements EndPoint {
 		if (connection.isIdle()) connection.notifyIdle();
 	}
 
+
 	private void performDataUpdate() throws IOException {
 		emptySelects = 0;
 		Set<SelectionKey> keys = selector.selectedKeys();
 		synchronized (keys) {
-			UdpConnection udp = this.udp;
 			outer:
 			for (Iterator<SelectionKey> iter = keys.iterator(); iter.hasNext(); ) {
 				keepAlive();
@@ -247,57 +248,35 @@ public class Server implements EndPoint {
 				iter.remove();
 				Connection fromConnection = (Connection) selectionKey.attachment();
 				try {
-					int ops = selectionKey.readyOps();
+					int operationsSet = selectionKey.readyOps();
 
 					if (fromConnection != null) { // Must be a TCP read or write operation.
 						if (udp != null && fromConnection.udpRemoteAddress == null) {
 							fromConnection.close();
 							continue;
 						}
-						if ((ops & SelectionKey.OP_READ) == SelectionKey.OP_READ) {
+						if ((operationsSet & SelectionKey.OP_READ) == SelectionKey.OP_READ) {
 							try {
-								while (true) {
-									Object object = fromConnection.tcp.readObject(fromConnection);
-									if (object == null) break;
-									if (DEBUG) {
-										String objectString = object == null ? "null" : object.getClass().getSimpleName();
-										if (!(object instanceof FrameworkMessage)) {
-											debug("kryonet", fromConnection + " received TCP: " + objectString);
-										} else if (TRACE) {
-											trace("kryonet", fromConnection + " received TCP: " + objectString);
-										}
-									}
-									fromConnection.notifyReceived(object);
-								}
+								readObjectsFromTcpConnection(fromConnection);
 							} catch (IOException ex) {
-								if (TRACE) {
-									trace("kryonet", "Unable to read TCP from: " + fromConnection, ex);
-								} else if (DEBUG) {
-									debug("kryonet", fromConnection + " update: " + ex.getMessage());
-								}
-								fromConnection.close();
+								handleIOExceptionFromConnection(fromConnection, ex, "Unable to read TCP from: ");
 							} catch (KryoNetException ex) {
 								if (ERROR)
 									error("kryonet", "Error reading TCP from connection: " + fromConnection, ex);
 								fromConnection.close();
 							}
 						}
-						if ((ops & SelectionKey.OP_WRITE) == SelectionKey.OP_WRITE) {
+						if ((operationsSet & SelectionKey.OP_WRITE) == SelectionKey.OP_WRITE) {
 							try {
 								fromConnection.tcp.writeOperation();
 							} catch (IOException ex) {
-								if (TRACE) {
-									trace("kryonet", "Unable to write TCP to connection: " + fromConnection, ex);
-								} else if (DEBUG) {
-									debug("kryonet", fromConnection + " update: " + ex.getMessage());
-								}
-								fromConnection.close();
+								handleIOExceptionFromConnection(fromConnection, ex, "Unable to write TCP to connection: ");
 							}
 						}
 						continue;
 					}
 
-					if ((ops & SelectionKey.OP_ACCEPT) == SelectionKey.OP_ACCEPT) {
+					if ((operationsSet & SelectionKey.OP_ACCEPT) == SelectionKey.OP_ACCEPT) {
 						ServerSocketChannel serverChannel = this.serverChannel;
 						if (serverChannel == null) continue;
 						try {
@@ -399,8 +378,31 @@ public class Server implements EndPoint {
 		}
 	}
 
-	private void increaseAndCheckEmptySelects(long startTime) {
-		emptySelects++;
+	private void handleIOExceptionFromConnection(Connection fromConnection, IOException ex, String s) {
+		if (TRACE) {
+			trace("kryonet", s + fromConnection, ex);
+		} else if (DEBUG) {
+			debug("kryonet", fromConnection + " update: " + ex.getMessage());
+		}
+		fromConnection.close();
+	}
+
+	private void readObjectsFromTcpConnection(Connection fromConnection) throws IOException {
+		Object object;
+		while ((object = fromConnection.tcp.readObject(fromConnection)) != null) {
+			if (DEBUG) {
+				String objectString = object == null ? "null" : object.getClass().getSimpleName();
+				if (!(object instanceof FrameworkMessage)) {
+					debug("kryonet", fromConnection + " received TCP: " + objectString);
+				} else if (TRACE) {
+					trace("kryonet", fromConnection + " received TCP: " + objectString);
+				}
+			}
+			fromConnection.notifyReceived(object);
+		}
+	}
+
+	private void checkEmptySelects(long startTime) {
 		if (emptySelects == 100) {
 			emptySelects = 0;
 			// NIO freaks and returns immediately with 0 sometimes, so try to keep from hogging the CPU.
@@ -448,7 +450,6 @@ public class Server implements EndPoint {
 		Connection connection = newConnection();
 		connection.initialize(serialization, writeBufferSize, objectBufferSize);
 		connection.endPoint = this;
-		UdpConnection udp = this.udp;
 		if (udp != null) connection.udp = udp;
 		try {
 			SelectionKey selectionKey = connection.tcp.accept(selector, socketChannel);
@@ -584,7 +585,6 @@ public class Server implements EndPoint {
 			this.serverChannel = null;
 		}
 
-		UdpConnection udp = this.udp;
 		if (udp != null) {
 			udp.close();
 			this.udp = null;
