@@ -203,195 +203,212 @@ public class Server implements EndPoint {
 		synchronized (updateLock) { // Blocks to avoid a select while the selector is used to bind the server connection.
 		}
 		long startTime = System.currentTimeMillis();
-		int select = 0;
+		int select = getSelectFromSelector(timeout);
+		if (select == 0) {
+			increaseAndCheckEmptySelects(startTime);
+		} else {
+			performDataUpdate();
+		}
+		long endTime = System.currentTimeMillis();
+		for (Connection connection : connections) {
+			checkConnectionState(endTime, connection);
+		}
+	}
+
+	private int getSelectFromSelector(int timeout) throws IOException {
+		int select;
 		if (timeout > 0) {
 			select = selector.select(timeout);
 		} else {
 			select = selector.selectNow();
 		}
-		if (select == 0) {
-			emptySelects++;
-			if (emptySelects == 100) {
-				emptySelects = 0;
-				// NIO freaks and returns immediately with 0 sometimes, so try to keep from hogging the CPU.
-				long elapsedTime = System.currentTimeMillis() - startTime;
-				try {
-					if (elapsedTime < 25) Thread.sleep(25 - elapsedTime);
-				} catch (InterruptedException ignored) {
-				}
-			}
+		return select;
+	}
+
+	private void checkConnectionState(long time, Connection connection) {
+		if (connection.tcp.isTimedOut(time)) {
+			if (DEBUG) debug("kryonet", connection + " timed out.");
+			connection.close();
 		} else {
-			emptySelects = 0;
-			Set<SelectionKey> keys = selector.selectedKeys();
-			synchronized (keys) {
-				UdpConnection udp = this.udp;
-				outer:
-				for (Iterator<SelectionKey> iter = keys.iterator(); iter.hasNext(); ) {
-					keepAlive();
-					SelectionKey selectionKey = iter.next();
-					iter.remove();
-					Connection fromConnection = (Connection) selectionKey.attachment();
-					try {
-						int ops = selectionKey.readyOps();
+			if (connection.tcp.needsKeepAlive(time)) connection.sendTCP(FrameworkMessage.keepAlive);
+		}
+		if (connection.isIdle()) connection.notifyIdle();
+	}
 
-						if (fromConnection != null) { // Must be a TCP read or write operation.
-							if (udp != null && fromConnection.udpRemoteAddress == null) {
-								fromConnection.close();
-								continue;
-							}
-							if ((ops & SelectionKey.OP_READ) == SelectionKey.OP_READ) {
-								try {
-									while (true) {
-										Object object = fromConnection.tcp.readObject(fromConnection);
-										if (object == null) break;
-										if (DEBUG) {
-											String objectString = object == null ? "null" : object.getClass().getSimpleName();
-											if (!(object instanceof FrameworkMessage)) {
-												debug("kryonet", fromConnection + " received TCP: " + objectString);
-											} else if (TRACE) {
-												trace("kryonet", fromConnection + " received TCP: " + objectString);
-											}
-										}
-										fromConnection.notifyReceived(object);
-									}
-								} catch (IOException ex) {
-									if (TRACE) {
-										trace("kryonet", "Unable to read TCP from: " + fromConnection, ex);
-									} else if (DEBUG) {
-										debug("kryonet", fromConnection + " update: " + ex.getMessage());
-									}
-									fromConnection.close();
-								} catch (KryoNetException ex) {
-									if (ERROR)
-										error("kryonet", "Error reading TCP from connection: " + fromConnection, ex);
-									fromConnection.close();
-								}
-							}
-							if ((ops & SelectionKey.OP_WRITE) == SelectionKey.OP_WRITE) {
-								try {
-									fromConnection.tcp.writeOperation();
-								} catch (IOException ex) {
-									if (TRACE) {
-										trace("kryonet", "Unable to write TCP to connection: " + fromConnection, ex);
-									} else if (DEBUG) {
-										debug("kryonet", fromConnection + " update: " + ex.getMessage());
-									}
-									fromConnection.close();
-								}
-							}
-							continue;
-						}
+	private void performDataUpdate() throws IOException {
+		emptySelects = 0;
+		Set<SelectionKey> keys = selector.selectedKeys();
+		synchronized (keys) {
+			UdpConnection udp = this.udp;
+			outer:
+			for (Iterator<SelectionKey> iter = keys.iterator(); iter.hasNext(); ) {
+				keepAlive();
+				SelectionKey selectionKey = iter.next();
+				iter.remove();
+				Connection fromConnection = (Connection) selectionKey.attachment();
+				try {
+					int ops = selectionKey.readyOps();
 
-						if ((ops & SelectionKey.OP_ACCEPT) == SelectionKey.OP_ACCEPT) {
-							ServerSocketChannel serverChannel = this.serverChannel;
-							if (serverChannel == null) continue;
-							try {
-								SocketChannel socketChannel = serverChannel.accept();
-								if (socketChannel != null) acceptOperation(socketChannel);
-							} catch (IOException ex) {
-								if (DEBUG) debug("kryonet", "Unable to accept new connection.", ex);
-							}
-							continue;
-						}
-
-						// Must be a UDP read operation.
-						if (udp == null) {
-							selectionKey.channel().close();
-							continue;
-						}
-						InetSocketAddress fromAddress;
-						try {
-							fromAddress = udp.readFromAddress();
-						} catch (IOException ex) {
-							if (WARN) warn("kryonet", "Error reading UDP data.", ex);
-							continue;
-						}
-						if (fromAddress == null) continue;
-
-						for (Connection connection : connections) {
-							if (fromAddress.equals(connection.udpRemoteAddress)) {
-								fromConnection = connection;
-								break;
-							}
-						}
-
-						Object object;
-						try {
-							object = udp.readObject(fromConnection);
-						} catch (KryoNetException ex) {
-							if (WARN) {
-								if (fromConnection != null) {
-									if (ERROR)
-										error("kryonet", "Error reading UDP from connection: " + fromConnection, ex);
-								} else
-									warn("kryonet", "Error reading UDP from unregistered address: " + fromAddress, ex);
-							}
-							continue;
-						}
-
-						if (object instanceof FrameworkMessage) {
-							if (object instanceof RegisterUDP) {
-								// Store the fromAddress on the connection and reply over TCP with a RegisterUDP to indicate success.
-								int fromConnectionID = ((RegisterUDP) object).connectionID;
-								Connection connection = pendingConnections.remove(fromConnectionID);
-								if (connection != null) {
-									if (connection.udpRemoteAddress != null) continue outer;
-									connection.udpRemoteAddress = fromAddress;
-									addConnection(connection);
-									connection.sendTCP(new RegisterUDP());
-									if (DEBUG) debug("kryonet",
-											"Port " + udp.datagramChannel.socket().getLocalPort() + "/UDP connected to: " + fromAddress);
-									connection.notifyConnected();
-									continue;
-								}
-								if (DEBUG)
-									debug("kryonet", "Ignoring incoming RegisterUDP with invalid connection ID: " + fromConnectionID);
-								continue;
-							}
-							if (object instanceof DiscoverHost) {
-								try {
-									boolean responseSent = discoveryHandler.onDiscoverHost(udp.datagramChannel, fromAddress,
-											serialization);
-									if (DEBUG && responseSent)
-										debug("kryonet", "Responded to host discovery from: " + fromAddress);
-								} catch (IOException ex) {
-									if (WARN)
-										warn("kryonet", "Error replying to host discovery from: " + fromAddress, ex);
-								}
-								continue;
-							}
-						}
-
-						if (fromConnection != null) {
-							if (DEBUG) {
-								String objectString = object == null ? "null" : object.getClass().getSimpleName();
-								if (object instanceof FrameworkMessage) {
-									if (TRACE) trace("kryonet", fromConnection + " received UDP: " + objectString);
-								} else
-									debug("kryonet", fromConnection + " received UDP: " + objectString);
-							}
-							fromConnection.notifyReceived(object);
-							continue;
-						}
-						if (DEBUG) debug("kryonet", "Ignoring UDP from unregistered address: " + fromAddress);
-					} catch (CancelledKeyException ex) {
-						if (fromConnection != null)
+					if (fromConnection != null) { // Must be a TCP read or write operation.
+						if (udp != null && fromConnection.udpRemoteAddress == null) {
 							fromConnection.close();
-						else
-							selectionKey.channel().close();
+							continue;
+						}
+						if ((ops & SelectionKey.OP_READ) == SelectionKey.OP_READ) {
+							try {
+								while (true) {
+									Object object = fromConnection.tcp.readObject(fromConnection);
+									if (object == null) break;
+									if (DEBUG) {
+										String objectString = object == null ? "null" : object.getClass().getSimpleName();
+										if (!(object instanceof FrameworkMessage)) {
+											debug("kryonet", fromConnection + " received TCP: " + objectString);
+										} else if (TRACE) {
+											trace("kryonet", fromConnection + " received TCP: " + objectString);
+										}
+									}
+									fromConnection.notifyReceived(object);
+								}
+							} catch (IOException ex) {
+								if (TRACE) {
+									trace("kryonet", "Unable to read TCP from: " + fromConnection, ex);
+								} else if (DEBUG) {
+									debug("kryonet", fromConnection + " update: " + ex.getMessage());
+								}
+								fromConnection.close();
+							} catch (KryoNetException ex) {
+								if (ERROR)
+									error("kryonet", "Error reading TCP from connection: " + fromConnection, ex);
+								fromConnection.close();
+							}
+						}
+						if ((ops & SelectionKey.OP_WRITE) == SelectionKey.OP_WRITE) {
+							try {
+								fromConnection.tcp.writeOperation();
+							} catch (IOException ex) {
+								if (TRACE) {
+									trace("kryonet", "Unable to write TCP to connection: " + fromConnection, ex);
+								} else if (DEBUG) {
+									debug("kryonet", fromConnection + " update: " + ex.getMessage());
+								}
+								fromConnection.close();
+							}
+						}
+						continue;
 					}
+
+					if ((ops & SelectionKey.OP_ACCEPT) == SelectionKey.OP_ACCEPT) {
+						ServerSocketChannel serverChannel = this.serverChannel;
+						if (serverChannel == null) continue;
+						try {
+							SocketChannel socketChannel = serverChannel.accept();
+							if (socketChannel != null) acceptOperation(socketChannel);
+						} catch (IOException ex) {
+							if (DEBUG) debug("kryonet", "Unable to accept new connection.", ex);
+						}
+						continue;
+					}
+
+					// Must be a UDP read operation.
+					if (udp == null) {
+						selectionKey.channel().close();
+						continue;
+					}
+					InetSocketAddress fromAddress;
+					try {
+						fromAddress = udp.readFromAddress();
+					} catch (IOException ex) {
+						if (WARN) warn("kryonet", "Error reading UDP data.", ex);
+						continue;
+					}
+					if (fromAddress == null) continue;
+
+					for (Connection connection : connections) {
+						if (fromAddress.equals(connection.udpRemoteAddress)) {
+							fromConnection = connection;
+							break;
+						}
+					}
+
+					Object object;
+					try {
+						object = udp.readObject(fromConnection);
+					} catch (KryoNetException ex) {
+						if (WARN) {
+							if (fromConnection != null) {
+								if (ERROR)
+									error("kryonet", "Error reading UDP from connection: " + fromConnection, ex);
+							} else
+								warn("kryonet", "Error reading UDP from unregistered address: " + fromAddress, ex);
+						}
+						continue;
+					}
+
+					if (object instanceof FrameworkMessage) {
+						if (object instanceof RegisterUDP) {
+							// Store the fromAddress on the connection and reply over TCP with a RegisterUDP to indicate success.
+							int fromConnectionID = ((RegisterUDP) object).connectionID;
+							Connection connection = pendingConnections.remove(fromConnectionID);
+							if (connection != null) {
+								if (connection.udpRemoteAddress != null) continue outer;
+								connection.udpRemoteAddress = fromAddress;
+								addConnection(connection);
+								connection.sendTCP(new RegisterUDP());
+								if (DEBUG) debug("kryonet",
+										"Port " + udp.datagramChannel.socket().getLocalPort() + "/UDP connected to: " + fromAddress);
+								connection.notifyConnected();
+								continue;
+							}
+							if (DEBUG)
+								debug("kryonet", "Ignoring incoming RegisterUDP with invalid connection ID: " + fromConnectionID);
+							continue;
+						}
+						if (object instanceof DiscoverHost) {
+							try {
+								boolean responseSent = discoveryHandler.onDiscoverHost(udp.datagramChannel, fromAddress,
+										serialization);
+								if (DEBUG && responseSent)
+									debug("kryonet", "Responded to host discovery from: " + fromAddress);
+							} catch (IOException ex) {
+								if (WARN)
+									warn("kryonet", "Error replying to host discovery from: " + fromAddress, ex);
+							}
+							continue;
+						}
+					}
+
+					if (fromConnection != null) {
+						if (DEBUG) {
+							String objectString = object == null ? "null" : object.getClass().getSimpleName();
+							if (object instanceof FrameworkMessage) {
+								if (TRACE) trace("kryonet", fromConnection + " received UDP: " + objectString);
+							} else
+								debug("kryonet", fromConnection + " received UDP: " + objectString);
+						}
+						fromConnection.notifyReceived(object);
+						continue;
+					}
+					if (DEBUG) debug("kryonet", "Ignoring UDP from unregistered address: " + fromAddress);
+				} catch (CancelledKeyException ex) {
+					if (fromConnection != null)
+						fromConnection.close();
+					else
+						selectionKey.channel().close();
 				}
 			}
 		}
-		long time = System.currentTimeMillis();
-		for (Connection connection : connections) {
-			if (connection.tcp.isTimedOut(time)) {
-				if (DEBUG) debug("kryonet", connection + " timed out.");
-				connection.close();
-			} else {
-				if (connection.tcp.needsKeepAlive(time)) connection.sendTCP(FrameworkMessage.keepAlive);
+	}
+
+	private void increaseAndCheckEmptySelects(long startTime) {
+		emptySelects++;
+		if (emptySelects == 100) {
+			emptySelects = 0;
+			// NIO freaks and returns immediately with 0 sometimes, so try to keep from hogging the CPU.
+			long elapsedTime = System.currentTimeMillis() - startTime;
+			try {
+				if (elapsedTime < 25) Thread.sleep(25 - elapsedTime);
+			} catch (InterruptedException ignored) {
 			}
-			if (connection.isIdle()) connection.notifyIdle();
 		}
 	}
 
