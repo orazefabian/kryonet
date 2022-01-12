@@ -241,7 +241,6 @@ public class Server implements EndPoint {
         emptySelects = 0;
         Set<SelectionKey> keys = selector.selectedKeys();
         synchronized (keys) {
-            outer:
             for (Iterator<SelectionKey> iter = keys.iterator(); iter.hasNext(); ) {
                 processUpdateOnSelectionKey(iter);
             }
@@ -253,21 +252,19 @@ public class Server implements EndPoint {
         SelectionKey selectionKey = iter.next();
         iter.remove();
         Connection fromConnection = (Connection) selectionKey.attachment();
+        processOperationFromSelectionKeyOntoConnection(selectionKey, fromConnection);
+    }
+
+    private void processOperationFromSelectionKeyOntoConnection(SelectionKey selectionKey, Connection fromConnection) throws IOException {
         try {
             int operationsSet = selectionKey.readyOps();
-
             if (fromConnection != null) { // Must be a TCP read or write operation.
-                if (udp != null && fromConnection.udpRemoteAddress == null) {
-                    fromConnection.close();
-                    return;
-                }
-                checkIfConnectionIsInReadOperation(fromConnection, operationsSet);
-                checkIfConnectionIsInWriteOperation(fromConnection, operationsSet);
-                return;
+                handleConnectionWithOpsSet(fromConnection, operationsSet);
+            } else if (checkIfServerChannelIsInAcceptOperation(operationsSet)) {
+                checkServerChannel();
+            } else if (udp == null) { // Must be a UDP read operation.
+                selectionKey.channel().close();
             }
-
-            if (checkIfServerChannelIsInAcceptOperation(operationsSet)) return;
-            if (isUdpConnectionNull(selectionKey)) return;
 
             InetSocketAddress fromAddress = null;
             Object object = null;
@@ -290,27 +287,32 @@ public class Server implements EndPoint {
         }
     }
 
-    private boolean isUdpConnectionNull(SelectionKey selectionKey) throws IOException {
-        // Must be a UDP read operation.
-        if (udp == null) {
-            selectionKey.channel().close();
-            return true;
+    private void checkServerChannel() {
+        if (serverChannel != null) {
+            acceptSocketChannelOperation();
         }
-        return false;
+    }
+
+    private void handleConnectionWithOpsSet(Connection fromConnection, int operationsSet) {
+        if (udp != null && fromConnection.udpRemoteAddress == null) {
+            fromConnection.close();
+        } else {
+            checkIfConnectionIsInReadOperation(fromConnection, operationsSet);
+            checkIfConnectionIsInWriteOperation(fromConnection, operationsSet);
+        }
     }
 
     private boolean checkIfServerChannelIsInAcceptOperation(int operationsSet) {
-        if ((operationsSet & SelectionKey.OP_ACCEPT) == SelectionKey.OP_ACCEPT) {
-            if (serverChannel == null) return true;
-            try {
-                SocketChannel socketChannel = serverChannel.accept();
-                if (socketChannel != null) acceptOperation(socketChannel);
-            } catch (IOException ex) {
-                if (DEBUG) debug("kryonet", "Unable to accept new connection.", ex);
-            }
-            return true;
+        return (operationsSet & SelectionKey.OP_ACCEPT) == SelectionKey.OP_ACCEPT;
+    }
+
+    private void acceptSocketChannelOperation() {
+        try {
+            SocketChannel socketChannel = serverChannel.accept();
+            if (socketChannel != null) acceptOperation(socketChannel);
+        } catch (IOException ex) {
+            if (DEBUG) debug("kryonet", "Unable to accept new connection.", ex);
         }
-        return false;
     }
 
     private Connection getConnectionCorrespondingToAddress(Connection fromConnection, InetSocketAddress fromAddress) {
