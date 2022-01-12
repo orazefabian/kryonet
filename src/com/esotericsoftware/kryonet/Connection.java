@@ -22,6 +22,8 @@ package com.esotericsoftware.kryonet;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryonet.FrameworkMessage.Ping;
 
+import javax.annotation.CheckForNull;
+import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -40,16 +42,16 @@ import static com.esotericsoftware.minlog.Log.*;
  * @author Nathan Sweet <misc@n4te.com>
  */
 public class Connection {
-	private final Object listenerLock = new Object();
+	@Nonnull private final Object listenerLock = new Object();
 	int id = -1;
-	EndPoint endPoint;
-	TcpConnection tcp;
-	UdpConnection udp;
-	InetSocketAddress udpRemoteAddress;
+	@Nonnull EndPoint endPoint;
+	@Nonnull TcpConnection tcp;
+	@Nonnull UdpConnection udp;
+	@Nonnull InetSocketAddress udpRemoteAddress;
 	volatile boolean isConnected;
-	volatile KryoNetException lastProtocolError;
+	@CheckForNull volatile KryoNetException lastProtocolError;
 	private String name;
-	private Listener[] listeners = {};
+	@Nonnull private Listener[] listeners = {};
 	private int lastPingID;
 	private long lastPingSendTime;
 	private int returnTripTime;
@@ -86,6 +88,7 @@ public class Connection {
 	 *
 	 * @return The last protocol error or null if none error occured.
 	 */
+	@CheckForNull
 	public KryoNetException getLastProtocolError() {
 		return lastProtocolError;
 	}
@@ -96,7 +99,7 @@ public class Connection {
 	 * @return The number of bytes sent.
 	 * @see Kryo#register(Class, com.esotericsoftware.kryo.Serializer)
 	 */
-	public int sendTCP(Object object) {
+	public int sendTCP(@Nonnull Object object) {
 		if (object == null) {
 			throw new IllegalArgumentException("object cannot be null.");
 		}
@@ -132,7 +135,7 @@ public class Connection {
 	 * @throws IllegalStateException if this connection was not opened with both TCP and UDP.
 	 * @see Kryo#register(Class, com.esotericsoftware.kryo.Serializer)
 	 */
-	public int sendUDP(Object object) {
+	public int sendUDP(@Nonnull Object object) {
 		if (object == null) throw new IllegalArgumentException("object cannot be null.");
 		SocketAddress address = udpRemoteAddress;
 		if (address == null && udp != null) address = udp.connectedAddress;
@@ -171,7 +174,9 @@ public class Connection {
 		boolean wasConnected = isConnected;
 		isConnected = false;
 		tcp.close();
-		if (udp != null && udp.connectedAddress != null) udp.close();
+		if (udp != null && udp.connectedAddress != null) {
+			udp.close();
+		}
 		if (wasConnected) {
 			notifyDisconnected();
 			if (INFO) info("kryonet", this + " disconnected.");
@@ -224,8 +229,10 @@ public class Connection {
 	/**
 	 * If the listener already exists, it is not added again.
 	 */
-	public void addListener(Listener listener) {
-		if (listener == null) throw new IllegalArgumentException("listener cannot be null.");
+	public void addListener(@Nonnull Listener listener) {
+		if (listener == null) {
+			throw new IllegalArgumentException("listener cannot be null.");
+		}
 		synchronized (listenerLock) {
 			Listener[] listeners = this.listeners;
 			int n = listeners.length;
@@ -238,8 +245,10 @@ public class Connection {
 		if (TRACE) trace("kryonet", "Connection listener added: " + listener.getClass().getName());
 	}
 
-	public void removeListener(Listener listener) {
-		if (listener == null) throw new IllegalArgumentException("listener cannot be null.");
+	public void removeListener(@Nonnull Listener listener) {
+		if (listener == null) {
+			throw new IllegalArgumentException("listener cannot be null.");
+		}
 		synchronized (listenerLock) {
 			Listener[] listeners = this.listeners;
 			int n = listeners.length;
@@ -258,17 +267,17 @@ public class Connection {
 
 	void notifyConnected() {
 		if (INFO) {
-			SocketChannel socketChannel = tcp.socketChannel;
+			final SocketChannel socketChannel = tcp.socketChannel;
 			if (socketChannel != null) {
-				Socket socket = tcp.socketChannel.socket();
+				final Socket socket = tcp.socketChannel.socket();
 				if (socket != null) {
-					InetSocketAddress remoteSocketAddress = (InetSocketAddress) socket.getRemoteSocketAddress();
+					final InetSocketAddress remoteSocketAddress = (InetSocketAddress) socket.getRemoteSocketAddress();
 					if (remoteSocketAddress != null)
 						info("kryonet", this + " connected: " + remoteSocketAddress.getAddress());
 				}
 			}
 		}
-		Listener[] listeners = this.listeners;
+		final Listener[] listeners = this.listeners;
 		for (Listener listener : listeners) listener.connected(this);
 	}
 
@@ -305,6 +314,7 @@ public class Connection {
 	/**
 	 * Returns the local {@link Client} or {@link Server} to which this connection belongs.
 	 */
+	@Nonnull
 	public EndPoint getEndPoint() {
 		return endPoint;
 	}
@@ -373,7 +383,9 @@ public class Connection {
 	}
 
 	public String toString() {
-		if (name != null) return name;
+		if (name != null) {
+			return name;
+		}
 		return "Connection " + id;
 	}
 }

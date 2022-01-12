@@ -21,6 +21,8 @@ package com.esotericsoftware.kryonet;
 
 import com.esotericsoftware.kryo.Kryo;
 
+import javax.annotation.CheckForNull;
+import javax.annotation.Nonnull;
 import java.io.IOException;
 
 /**
@@ -32,14 +34,15 @@ public interface EndPoint extends Runnable {
 	/**
 	 * Gets the serialization instance that will be used to serialize and deserialize objects.
 	 */
+	@Nonnull
 	Serialization getSerialization();
 
 	/**
 	 * If the listener already exists, it is not added again.
 	 */
-	void addListener(Listener listener);
+	void addListener(@Nonnull Listener listener);
 
-	void removeListener(Listener listener);
+	void removeListener(@Nonnull Listener listener);
 
 	/**
 	 * Continually updates this end point until {@link #stop()} is called.
@@ -72,6 +75,7 @@ public interface EndPoint extends Runnable {
 	 * Returns the last thread that called {@link #update(int)} for this end point. This can be useful to detect when long running
 	 * code will be run on the update thread.
 	 */
+	@CheckForNull
 	Thread getUpdateThread();
 
 	/**
@@ -80,5 +84,6 @@ public interface EndPoint extends Runnable {
 	 *
 	 * @return May be null.
 	 */
+	@CheckForNull
 	Kryo getKryo();
 }
