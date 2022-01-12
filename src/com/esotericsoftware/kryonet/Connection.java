@@ -24,6 +24,7 @@ import com.esotericsoftware.kryonet.FrameworkMessage.Ping;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -46,8 +47,8 @@ public class Connection {
 	@Nonnull private final Object listenerLock = new Object();
 	int id = -1;
 	@Nonnull EndPoint endPoint;
-	@Nonnull TcpConnection tcp;
-	@Nonnull UdpConnection udp;
+	@Nullable TcpConnection tcp;
+	@Nullable UdpConnection udp;
 	@Nonnull InetSocketAddress udpRemoteAddress;
 	volatile boolean isConnected;
 	@CheckForNull volatile KryoNetException lastProtocolError;
