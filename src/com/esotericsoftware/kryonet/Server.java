@@ -161,24 +161,28 @@ public class Server implements EndPoint {
         close();
         synchronized (updateLock) {
             selector.wakeup();
-            try {
-                serverChannel = selector.provider().openServerSocketChannel();
-                serverChannel.socket().bind(tcpPort);
-                serverChannel.configureBlocking(false);
-                serverChannel.register(selector, SelectionKey.OP_ACCEPT);
-                if (DEBUG) debug("kryonet", "Accepting connections on port: " + tcpPort + "/TCP");
-
-                if (udpPort != null) {
-                    udp = new UdpConnection(serialization, objectBufferSize);
-                    udp.bind(selector, udpPort);
-                    if (DEBUG) debug("kryonet", "Accepting connections on port: " + udpPort + "/UDP");
-                }
-            } catch (IOException ex) {
-                close();
-                throw ex;
-            }
+            bindTcpAndUpdPorts(tcpPort, udpPort);
         }
         if (INFO) info("kryonet", "Server opened.");
+    }
+
+    private void bindTcpAndUpdPorts(InetSocketAddress tcpPort, InetSocketAddress udpPort) throws IOException {
+        try {
+            serverChannel = selector.provider().openServerSocketChannel();
+            serverChannel.socket().bind(tcpPort);
+            serverChannel.configureBlocking(false);
+            serverChannel.register(selector, SelectionKey.OP_ACCEPT);
+            if (DEBUG) debug("kryonet", "Accepting connections on port: " + tcpPort + "/TCP");
+
+            if (udpPort != null) {
+                udp = new UdpConnection(serialization, objectBufferSize);
+                udp.bind(selector, udpPort);
+                if (DEBUG) debug("kryonet", "Accepting connections on port: " + udpPort + "/UDP");
+            }
+        } catch (IOException ex) {
+            close();
+            throw ex;
+        }
     }
 
     public int getTcpPort() {
@@ -434,15 +438,19 @@ public class Server implements EndPoint {
     private void readObjectsFromTcpConnection(Connection fromConnection) throws IOException {
         Object object;
         while ((object = fromConnection.tcp.readObject(fromConnection)) != null) {
-            if (DEBUG) {
-                String objectString = object == null ? "null" : object.getClass().getSimpleName();
-                if (!(object instanceof FrameworkMessage)) {
-                    debug("kryonet", fromConnection + " received TCP: " + objectString);
-                } else if (TRACE) {
-                    trace("kryonet", fromConnection + " received TCP: " + objectString);
-                }
-            }
+            debugTCPConnection(fromConnection, object);
             fromConnection.notifyReceived(object);
+        }
+    }
+
+    private void debugTCPConnection(Connection fromConnection, Object object) {
+        if (DEBUG) {
+            String objectString = object == null ? "null" : object.getClass().getSimpleName();
+            if (!(object instanceof FrameworkMessage)) {
+                debug("kryonet", fromConnection + " received TCP: " + objectString);
+            } else if (TRACE) {
+                trace("kryonet", fromConnection + " received TCP: " + objectString);
+            }
         }
     }
 
@@ -496,29 +504,33 @@ public class Server implements EndPoint {
         connection.endPoint = this;
         if (udp != null) connection.udp = udp;
         try {
-            SelectionKey selectionKey = connection.tcp.accept(selector, socketChannel);
-            selectionKey.attach(connection);
-
-            int id = nextConnectionID++;
-            if (nextConnectionID == -1) nextConnectionID = 1;
-            connection.id = id;
-            connection.setConnected(true);
-            connection.addListener(dispatchListener);
-
-            if (udp == null)
-                addConnection(connection);
-            else
-                pendingConnections.put(id, connection);
-
-            RegisterTCP registerConnection = new RegisterTCP();
-            registerConnection.connectionID = id;
-            connection.sendTCP(registerConnection);
-
-            if (udp == null) connection.notifyConnected();
+            acceptTCPConnection(socketChannel, connection);
         } catch (IOException ex) {
             connection.close();
             if (DEBUG) debug("kryonet", "Unable to accept TCP connection.", ex);
         }
+    }
+
+    private void acceptTCPConnection(SocketChannel socketChannel, Connection connection) throws IOException {
+        SelectionKey selectionKey = connection.tcp.accept(selector, socketChannel);
+        selectionKey.attach(connection);
+
+        int id = nextConnectionID++;
+        if (nextConnectionID == -1) nextConnectionID = 1;
+        connection.id = id;
+        connection.setConnected(true);
+        connection.addListener(dispatchListener);
+
+        if (udp == null)
+            addConnection(connection);
+        else
+            pendingConnections.put(id, connection);
+
+        RegisterTCP registerConnection = new RegisterTCP();
+        registerConnection.connectionID = id;
+        connection.sendTCP(registerConnection);
+
+        if (udp == null) connection.notifyConnected();
     }
 
     /**
