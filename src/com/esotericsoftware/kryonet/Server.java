@@ -43,15 +43,19 @@ import static com.esotericsoftware.minlog.Log.*;
  */
 public class Server implements EndPoint {
     private final Serialization serialization;
+
+	// tcp stuff
     private final int writeBufferSize, objectBufferSize;
     private final Selector selector;
     private final IntMap<Connection> pendingConnections = new IntMap<>();
     private final CopyOnWriteArrayList<Listener> listeners = new CopyOnWriteArrayList<>();
     private int emptySelects;
     private ServerSocketChannel serverChannel;
-    private UdpConnection udp;
-    private ArrayList<Connection> connections;
+	private ArrayList<Connection> connections;
     private final Semaphore semaphore;
+
+	// udp
+	private UdpConnection udp;
 
     private final Listener dispatchListener = new Listener() {
         public void connected(Connection connection) {
@@ -520,7 +524,7 @@ public class Server implements EndPoint {
     }
 
     private void acceptOperation(SocketChannel socketChannel) {
-        Connection connection = newConnection();
+		Connection connection = new Connection();
         connection.initialize(serialization, writeBufferSize, objectBufferSize);
         connection.endPoint = this;
         if (udp != null) connection.udp = udp;
@@ -555,15 +559,7 @@ public class Server implements EndPoint {
         if (udp == null) connection.notifyConnected();
     }
 
-    /**
-     * Allows the connections used by the server to be subclassed. This can be useful for storage per connection without an
-     * additional lookup.
-     */
-    protected Connection newConnection() {
-        return new Connection();
-    }
-
-    private void addConnection(Connection connection) {
+	private void addConnection(Connection connection) {
         connections.add(connection);
     }
 
@@ -649,10 +645,9 @@ public class Server implements EndPoint {
         for (Connection connection : connections) connection.close();
         connections = new ArrayList<>();
 
-        ServerSocketChannel serverChannel = this.serverChannel;
-        if (serverChannel != null) {
+		if (this.serverChannel != null) {
             try {
-                serverChannel.close();
+                this.serverChannel.close();
                 if (INFO) info("kryonet", "Server closed.");
             } catch (IOException ex) {
                 if (DEBUG) debug("kryonet", "Unable to close server.", ex);
