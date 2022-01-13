@@ -88,7 +88,7 @@ public class BufferTest {
 		byte[] b = new byte[1024 * 10];
 		for (int i = 0; i < messageCount; i++) {
 			System.out.println("Client sending: " + i);
-			client.sendTCP(new LargeMessage(b));
+			client.connection.sendTCP(new LargeMessage(b));
 		}
 		System.out.println("Client has queued " + messageCount + " messages.");
 

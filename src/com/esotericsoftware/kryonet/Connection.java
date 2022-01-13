@@ -44,7 +44,6 @@ import static com.esotericsoftware.minlog.Log.*;
  * @author Nathan Sweet <misc@n4te.com>
  */
 public class Connection {
-	@Nonnull private final Object listenerLock = new Object();
 	int id = -1;
 	@Nonnull EndPoint endPoint;
 	@Nullable TcpConnection tcp;

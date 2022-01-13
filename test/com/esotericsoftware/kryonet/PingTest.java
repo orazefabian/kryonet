@@ -40,14 +40,14 @@ public class PingTest {
 		extension.startEndPoint(client);
 		client.addListener(new Listener() {
 			public void connected(Connection connection) {
-				client.updateReturnTripTime();
+				client.connection.updateReturnTripTime();
 			}
 
 			public void received(Connection connection, Object object) {
 				if (object instanceof Ping) {
 					Ping ping = (Ping) object;
 					if (ping.isReply) System.out.println("Ping: " + connection.getReturnTripTime());
-					client.updateReturnTripTime();
+					client.connection.updateReturnTripTime();
 				}
 			}
 		});
