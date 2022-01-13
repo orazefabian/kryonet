@@ -25,6 +25,7 @@ import com.esotericsoftware.kryonet.FrameworkMessage.DiscoverHost;
 import com.esotericsoftware.kryonet.FrameworkMessage.RegisterTCP;
 import com.esotericsoftware.kryonet.FrameworkMessage.RegisterUDP;
 
+import javax.security.auth.callback.Callback;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.*;
@@ -32,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Semaphore;
 
 import static com.esotericsoftware.minlog.Log.*;
 
@@ -51,6 +53,7 @@ public class Server implements EndPoint {
     private ServerSocketChannel serverChannel;
     private UdpConnection udp;
     private ArrayList<Connection> connections;
+    private final Semaphore semaphore;
 
     private final Listener dispatchListener = new Listener() {
         public void connected(Connection connection) {
@@ -117,6 +120,7 @@ public class Server implements EndPoint {
         this.serialization = serialization;
         this.discoveryHandler = ServerDiscoveryHandler.DEFAULT;
         this.connections = new ArrayList<>();
+        this.semaphore = new Semaphore(1,true);
         try {
             selector = Selector.open();
         } catch (IOException ex) {
@@ -159,11 +163,15 @@ public class Server implements EndPoint {
      */
     public void bind(InetSocketAddress tcpPort, InetSocketAddress udpPort) throws IOException {
         close();
-        synchronized (updateLock) {
+        try {
+            semaphore.acquire();
             selector.wakeup();
             bindTcpAndUpdPorts(tcpPort, udpPort);
+            if (INFO) info("kryonet", "Server opened.");
+            semaphore.release();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
-        if (INFO) info("kryonet", "Server opened.");
     }
 
     private void bindTcpAndUpdPorts(InetSocketAddress tcpPort, InetSocketAddress udpPort) throws IOException {
@@ -201,8 +209,9 @@ public class Server implements EndPoint {
      */
     public void update(int timeout) throws IOException {
         updateThread = Thread.currentThread();
-        synchronized (updateLock) { // Blocks to avoid a select while the selector is used to bind the server connection.
-        }
+
+        waitForLockAndReleaseImmediately();
+
         long startTime = System.currentTimeMillis();
         int select = getNumberOfKeysFromSelector(timeout);
         if (select == 0) {
@@ -214,6 +223,15 @@ public class Server implements EndPoint {
         long endTime = System.currentTimeMillis();
         for (Connection connection : connections) {
             checkConnectionState(endTime, connection);
+        }
+    }
+
+    private void waitForLockAndReleaseImmediately() {
+        try {
+            semaphore.acquire();
+            semaphore.release();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
     }
 
@@ -643,8 +661,8 @@ public class Server implements EndPoint {
             this.udp = null;
         }
 
-        synchronized (updateLock) { // Blocks to avoid a select while the selector is used to bind the server connection.
-        }
+        waitForLockAndReleaseImmediately();
+
         // Select one last time to complete closing the socket.
         selector.wakeup();
         try {
