@@ -19,7 +19,6 @@
 
 package com.esotericsoftware.kryonet;
 
-import com.esotericsoftware.kryonet.util.InputStreamSender;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
