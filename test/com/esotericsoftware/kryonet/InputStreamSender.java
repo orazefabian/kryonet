@@ -17,35 +17,38 @@
  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 
-package com.esotericsoftware.kryonet.util;
+package com.esotericsoftware.kryonet;
 
-import com.esotericsoftware.kryonet.Connection;
-import com.esotericsoftware.kryonet.Listener;
+import java.io.IOException;
+import java.io.InputStream;
 
-abstract public class TcpIdleSender extends Listener {
-	boolean started;
+abstract public class InputStreamSender extends TcpIdleSender {
+	private final InputStream input;
+	private final byte[] chunk;
 
-	public void idle(Connection connection) {
-		if (!started) {
-			started = true;
-			start();
+	public InputStreamSender(InputStream input, int chunkSize) {
+		this.input = input;
+		chunk = new byte[chunkSize];
+	}
+
+	protected final Object next() {
+		try {
+			int total = 0;
+			while (total < chunk.length) {
+				int count = input.read(chunk, total, chunk.length - total);
+				if (count < 0) {
+					if (total == 0) return null;
+					byte[] partial = new byte[total];
+					System.arraycopy(chunk, 0, partial, 0, total);
+					return next(partial);
+				}
+				total += count;
+			}
+		} catch (IOException ex) {
+			throw new KryoNetException(ex);
 		}
-		Object object = next();
-		if (object == null)
-			connection.removeListener(this);
-		else
-			connection.sendTCP(object);
+		return next(chunk);
 	}
 
-	/**
-	 * Called once, before the first send. Subclasses can override this method to send something so the receiving side expects
-	 * subsequent objects.
-	 */
-	protected void start() {
-	}
-
-	/**
-	 * Returns the next object to send, or null if no more objects will be sent.
-	 */
-	abstract protected Object next();
+	abstract protected Object next(byte[] chunk);
 }
