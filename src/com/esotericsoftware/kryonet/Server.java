@@ -118,7 +118,7 @@ public class Server implements EndPoint {
         this.serialization = serialization;
         this.discoveryHandler = ServerDiscoveryHandler.DEFAULT;
         this.connections = new ArrayList<>();
-        this.semaphore = new Semaphore(1,true);
+        this.semaphore = new Semaphore(1, true);
         try {
             selector = Selector.open();
         } catch (IOException ex) {
@@ -275,27 +275,27 @@ public class Server implements EndPoint {
         SelectionKey selectionKey = iter.next();
         iter.remove();
         Connection fromConnection = (Connection) selectionKey.attachment();
-        processOperationFromSelectionKeyOntoConnection(selectionKey, fromConnection);
-    }
-
-    private void processOperationFromSelectionKeyOntoConnection(SelectionKey selectionKey, Connection fromConnection) throws IOException {
         try {
-            int operationsSet = selectionKey.readyOps();
-            if (fromConnection != null) { // Must be a TCP read or write operation.
-                handleConnectionWithOpsSet(fromConnection, operationsSet);
-            } else if (checkIfServerChannelIsInAcceptOperation(operationsSet)) {
-                checkServerChannelAndAcceptOps();
-            } else if (udp == null) { // Must be a UDP read operation.
-                selectionKey.channel().close();
-            } else {
-                fromConnection = updateConnectionBasedOnUDPAddress(fromConnection);
-            }
+            processOperationFromSelectionKeyOntoConnection(selectionKey, fromConnection);
         } catch (CancelledKeyException ex) {
             handleCancelledKeyExceptionFromConnection(selectionKey, fromConnection);
         }
     }
 
-    private Connection updateConnectionBasedOnUDPAddress(Connection fromConnection) {
+    private void processOperationFromSelectionKeyOntoConnection(SelectionKey selectionKey, Connection fromConnection) throws IOException, CancelledKeyException {
+        int operationsSet = selectionKey.readyOps();
+        if (fromConnection != null) { // Must be a TCP read or write operation.
+            handleConnectionWithOpsSet(fromConnection, operationsSet);
+        } else if (checkIfServerChannelIsInAcceptOperation(operationsSet)) {
+            checkServerChannelAndAcceptOps();
+        } else if (udp == null) { // Must be a UDP read operation.
+            selectionKey.channel().close();
+        } else {
+            updateConnectionBasedOnUDPAddress(fromConnection);
+        }
+    }
+
+    private void updateConnectionBasedOnUDPAddress(Connection fromConnection) {
         InetSocketAddress fromAddress = null;
         Object object;
         try {
@@ -311,7 +311,6 @@ public class Server implements EndPoint {
             handleKryoNetExceptionFromConnection(fromConnection, fromAddress, ex);
         }
         if (DEBUG) debug("kryonet", "Ignoring UDP from unregistered address: " + fromAddress);
-        return fromConnection;
     }
 
     private void checkServerChannelAndAcceptOps() {
