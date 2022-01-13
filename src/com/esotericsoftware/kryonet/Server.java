@@ -25,7 +25,6 @@ import com.esotericsoftware.kryonet.FrameworkMessage.DiscoverHost;
 import com.esotericsoftware.kryonet.FrameworkMessage.RegisterTCP;
 import com.esotericsoftware.kryonet.FrameworkMessage.RegisterUDP;
 
-import javax.security.auth.callback.Callback;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.*;
@@ -47,7 +46,6 @@ public class Server implements EndPoint {
     private final int writeBufferSize, objectBufferSize;
     private final Selector selector;
     private final IntMap<Connection> pendingConnections = new IntMap<>();
-    private final Object updateLock = new Object();
     private final CopyOnWriteArrayList<Listener> listeners = new CopyOnWriteArrayList<>();
     private int emptySelects;
     private ServerSocketChannel serverChannel;
@@ -209,9 +207,12 @@ public class Server implements EndPoint {
      */
     public void update(int timeout) throws IOException {
         updateThread = Thread.currentThread();
-
         waitForLockAndReleaseImmediately();
+        checkSelectorKeys(timeout);
+        updateAllConnections();
+    }
 
+    private void checkSelectorKeys(int timeout) throws IOException {
         long startTime = System.currentTimeMillis();
         int select = getNumberOfKeysFromSelector(timeout);
         if (select == 0) {
@@ -220,6 +221,9 @@ public class Server implements EndPoint {
         } else {
             performDataUpdateOnSelector();
         }
+    }
+
+    private void updateAllConnections() {
         long endTime = System.currentTimeMillis();
         for (Connection connection : connections) {
             checkConnectionState(endTime, connection);
@@ -539,10 +543,11 @@ public class Server implements EndPoint {
         connection.setConnected(true);
         connection.addListener(dispatchListener);
 
-        if (udp == null)
+        if (udp == null) {
             addConnection(connection);
-        else
+        } else {
             pendingConnections.put(id, connection);
+        }
 
         RegisterTCP registerConnection = new RegisterTCP();
         registerConnection.connectionID = id;
