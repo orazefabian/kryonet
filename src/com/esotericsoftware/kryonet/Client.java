@@ -36,7 +36,6 @@ import java.nio.channels.Selector;
 import java.security.AccessControlException;
 import java.util.*;
 
-import static com.esotericsoftware.minlog.Log.*;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -107,18 +106,12 @@ public class Client implements EndPoint {
 	}
 
 	public Client(int writeBufferSize, int objectBufferSize, @Nonnull Serialization serialization) {
-		super();
-		connection = new Connection();
-
 		requireNonNull(serialization);
-
-		connection.endPoint = this;
+		connection = new Connection(serialization, writeBufferSize, objectBufferSize, this);
 
 		this.serialization = serialization;
 
 		this.discoveryHandler = ClientDiscoveryHandler.DEFAULT;
-
-		connection.initialize(serialization, writeBufferSize, objectBufferSize);
 
 		try {
 			selector = Selector.open();
@@ -535,14 +528,14 @@ public class Client implements EndPoint {
 		selector.close();
 	}
 
-	public void addListener(Listener listener) {
+	public void addListener(@Nonnull Listener listener) {
 		connection.addListener(listener);
 		if (TRACE) {
 			trace("kryonet", "Client listener added.");
 		}
 	}
 
-	public void removeListener(Listener listener) {
+	public void removeListener(@Nonnull Listener listener) {
 		connection.removeListener(listener);
 		if (TRACE) {
 			trace("kryonet", "Client listener removed.");

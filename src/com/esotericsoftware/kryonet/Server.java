@@ -524,9 +524,8 @@ public class Server implements EndPoint {
     }
 
     private void acceptOperation(SocketChannel socketChannel) {
-		Connection connection = new Connection();
-        connection.initialize(serialization, writeBufferSize, objectBufferSize);
-        connection.endPoint = this;
+		Connection connection = new Connection(serialization, writeBufferSize, objectBufferSize, this);
+
         if (udp != null) connection.udp = udp;
         try {
             acceptTCPConnection(socketChannel, connection);
