@@ -37,6 +37,7 @@ import java.security.AccessControlException;
 import java.util.*;
 
 import static java.util.Objects.requireNonNull;
+import static com.esotericsoftware.minlog.Log.*;
 
 /**
  * Represents a TCP and optionally a UDP connection to a {@link Server}.
