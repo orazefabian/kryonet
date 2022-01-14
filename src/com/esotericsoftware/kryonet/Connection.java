@@ -34,6 +34,7 @@ import java.nio.channels.SocketChannel;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static com.esotericsoftware.minlog.Log.*;
+import static java.util.Objects.requireNonNull;
 
 // BOZO - Layer to handle handshake state.
 
@@ -44,10 +45,9 @@ import static com.esotericsoftware.minlog.Log.*;
  * @author Nathan Sweet <misc@n4te.com>
  */
 public class Connection {
-	@Nonnull private final Object listenerLock = new Object();
 	int id = -1;
-	@Nonnull EndPoint endPoint;
-	@Nullable TcpConnection tcp;
+	@Nonnull private final EndPoint endPoint;
+	@Nullable final TcpConnection tcp;
 	@Nullable UdpConnection udp;
 	@Nonnull InetSocketAddress udpRemoteAddress;
 	volatile boolean isConnected;
@@ -58,13 +58,12 @@ public class Connection {
 	private long lastPingSendTime;
 	private int returnTripTime;
 
-	protected Connection() {
-	}
+	protected Connection(Serialization serialization, int writeBufferSize, int objectBufferSize, @Nonnull EndPoint endPoint) {
+		requireNonNull(endPoint);
 
-	void initialize(Serialization serialization, int writeBufferSize, int objectBufferSize) {
 		tcp = new TcpConnection(serialization, writeBufferSize, objectBufferSize);
+		this.endPoint = endPoint;
 	}
-
 	/**
 	 * Returns the server assigned ID. Will return -1 if this connection has never been connected or the last assigned ID if this
 	 * connection has been disconnected.
