@@ -19,6 +19,7 @@
 
 package com.esotericsoftware.kryonet;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketAddress;
@@ -119,14 +120,8 @@ class TcpConnection {
 		if (currentObjectLength == 0) {
 			// Read the length of the next object from the socket.
 			int lengthLength = serialization.getLengthLength();
-			if (readBuffer.remaining() < lengthLength) {
-				readBuffer.compact();
-				int bytesRead = socketChannel.read(readBuffer);
-				readBuffer.flip();
-				if (bytesRead == -1) throw new SocketException("Connection is closed.");
-				lastReadTime = System.currentTimeMillis();
-
-				if (readBuffer.remaining() < lengthLength) return null;
+			if (doesFit(socketChannel, lengthLength)) {
+				return null;
 			}
 			currentObjectLength = serialization.readLength(readBuffer);
 
@@ -136,15 +131,8 @@ class TcpConnection {
 		}
 
 		int length = currentObjectLength;
-		if (readBuffer.remaining() < length) {
-			// Fill the tcpInputStream.
-			readBuffer.compact();
-			int bytesRead = socketChannel.read(readBuffer);
-			readBuffer.flip();
-			if (bytesRead == -1) throw new SocketException("Connection is closed.");
-			lastReadTime = System.currentTimeMillis();
-
-			if (readBuffer.remaining() < length) return null;
+		if (doesFit(socketChannel, length)) {
+			return null;
 		}
 		currentObjectLength = 0;
 
@@ -163,6 +151,23 @@ class TcpConnection {
 				+ (startPosition + length - readBuffer.position()) + " remaining) used to deserialize object: " + object);
 
 		return object;
+	}
+
+	private boolean doesFit(@Nonnull SocketChannel socketChannel, int size) throws IOException {
+		if (readBuffer.remaining() >= size) {
+			return false;
+		}
+
+		readBuffer.compact();
+		int bytesRead = socketChannel.read(readBuffer);
+		if (bytesRead == -1) {
+			throw new SocketException("Connection is closed.");
+		}
+
+		readBuffer.flip();
+		lastReadTime = System.currentTimeMillis();
+
+		return readBuffer.remaining() < size;
 	}
 
 	public void writeOperation() throws IOException {
