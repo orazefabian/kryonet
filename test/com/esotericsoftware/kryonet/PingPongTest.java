@@ -28,11 +28,11 @@ import java.io.IOException;
 import java.util.Arrays;
 
 @ExtendWith(KryonetExtension.class)
-public class PingPongTest {
+class PingPongTest {
 	String fail;
 
 	@Test
-	public void testPingPong(KryonetExtension.Kryonet extension) throws IOException {
+	void testPingPong(KryonetExtension.Kryonet extension) throws IOException {
 		fail = null;
 		Log.set(Log.LEVEL_DEBUG);
 

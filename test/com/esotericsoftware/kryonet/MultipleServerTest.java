@@ -28,11 +28,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.fail;
 
 @ExtendWith(KryonetExtension.class)
-public class MultipleServerTest {
+class MultipleServerTest {
 	AtomicInteger received = new AtomicInteger();
 
 	@Test
-	public void testMultipleThreads(KryonetExtension.Kryonet extension) throws IOException {
+	void testMultipleThreads(KryonetExtension.Kryonet extension) throws IOException {
 		final Server server1 = new Server(16384, 8192);
 		server1.getKryo().register(String[].class);
 		extension.startEndPoint(server1);

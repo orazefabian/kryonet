@@ -29,11 +29,11 @@ import java.util.Arrays;
 import static org.junit.jupiter.api.Assertions.fail;
 
 @ExtendWith(KryonetExtension.class)
-public class JsonTest {
+class JsonTest {
 	String fail;
 
 	@Test
-	public void testJson(KryonetExtension.Kryonet extension) throws IOException {
+	void testJson(KryonetExtension.Kryonet extension) throws IOException {
 		fail = null;
 		Log.set(Log.LEVEL_TRACE);
 		final Data dataTCP = new Data();

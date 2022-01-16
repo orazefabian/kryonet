@@ -49,7 +49,7 @@ public class Connection {
 	@Nonnull private final EndPoint endPoint;
 	@Nullable final TcpConnection tcp;
 	@Nullable UdpConnection udp;
-	@Nonnull InetSocketAddress udpRemoteAddress;
+	@Nullable InetSocketAddress udpRemoteAddress;
 	volatile boolean isConnected;
 	@CheckForNull volatile KryoNetException lastProtocolError;
 	private String name;

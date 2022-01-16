@@ -30,9 +30,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @ExtendWith(KryonetExtension.class)
-public class ReconnectTest {
+class ReconnectTest {
 	@Test
-	public void testReconnect(KryonetExtension.Kryonet extension) throws IOException {
+	void testReconnect(KryonetExtension.Kryonet extension) throws IOException {
 		final Timer timer = new Timer();
 
 		final Server server = new Server();

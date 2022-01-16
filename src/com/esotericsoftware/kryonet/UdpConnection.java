@@ -35,7 +35,8 @@ import static com.esotericsoftware.minlog.Log.debug;
  * @author Nathan Sweet <misc@n4te.com>
  */
 class UdpConnection {
-	final ByteBuffer readBuffer, writeBuffer;
+	final ByteBuffer readBuffer;
+	final ByteBuffer writeBuffer;
 	private final Serialization serialization;
 	private final Object writeLock = new Object();
 	InetSocketAddress connectedAddress;
@@ -90,12 +91,12 @@ class UdpConnection {
 	}
 
 	public InetSocketAddress readFromAddress() throws IOException {
-		DatagramChannel datagramChannel = this.datagramChannel;
-		if (datagramChannel == null) throw new SocketException("Connection is closed.");
+		DatagramChannel channel = this.datagramChannel;
+		if (channel == null) throw new SocketException("Connection is closed.");
 		lastCommunicationTime = System.currentTimeMillis();
-		if (!datagramChannel.isConnected())
-			return (InetSocketAddress) datagramChannel.receive(readBuffer); // always null on Android >= 5.0
-		datagramChannel.read(readBuffer);
+		if (!channel.isConnected())
+			return (InetSocketAddress) channel.receive(readBuffer); // always null on Android >= 5.0
+		channel.read(readBuffer);
 		return connectedAddress;
 	}
 
@@ -120,8 +121,8 @@ class UdpConnection {
 	 * This method is thread safe.
 	 */
 	public int send(Connection connection, Object object, SocketAddress address) throws IOException {
-		DatagramChannel datagramChannel = this.datagramChannel;
-		if (datagramChannel == null) throw new SocketException("Connection is closed.");
+		DatagramChannel channel = this.datagramChannel;
+		if (channel == null) throw new SocketException("Connection is closed.");
 		synchronized (writeLock) {
 			try {
 				try {
@@ -131,7 +132,7 @@ class UdpConnection {
 				}
 				writeBuffer.flip();
 				int length = writeBuffer.limit();
-				datagramChannel.send(writeBuffer, address);
+				channel.send(writeBuffer, address);
 
 				lastCommunicationTime = System.currentTimeMillis();
 

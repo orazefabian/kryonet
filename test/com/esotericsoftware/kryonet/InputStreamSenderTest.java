@@ -29,11 +29,11 @@ import java.io.IOException;
 import static org.junit.jupiter.api.Assertions.fail;
 
 @ExtendWith(KryonetExtension.class)
-public class InputStreamSenderTest {
+class InputStreamSenderTest {
 	boolean success;
 
 	@Test
-	public void testStream(KryonetExtension.Kryonet extension) throws IOException {
+	void testStream(KryonetExtension.Kryonet extension) throws IOException {
 		final int largeDataSize = 12345;
 
 		final Server server = new Server(16384, 8192);

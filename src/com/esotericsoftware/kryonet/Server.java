@@ -58,13 +58,15 @@ public class Server implements EndPoint {
 	private UdpConnection udp;
 
     private final Listener dispatchListener = new Listener() {
-        public void connected(Connection connection) {
+        @Override
+		public void connected(Connection connection) {
             for (Listener listener : listeners) {
                 listener.connected(connection);
             }
         }
 
-        public void disconnected(Connection connection) {
+        @Override
+		public void disconnected(Connection connection) {
             removeConnection(connection);
 
             for (Listener listener : listeners) {
@@ -72,13 +74,15 @@ public class Server implements EndPoint {
             }
         }
 
-        public void received(Connection connection, Object object) {
+        @Override
+		public void received(Connection connection, Object object) {
             for (Listener listener : listeners) {
                 listener.received(connection, object);
             }
         }
 
-        public void idle(Connection connection) {
+        @Override
+		public void idle(Connection connection) {
             for (Listener listener : listeners) {
                 listener.idle(connection);
             }
