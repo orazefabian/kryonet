@@ -193,59 +193,71 @@ public class Client implements EndPoint {
 
 		connection.id = -1;
 		try {
-			if (udpPort != -1) {
-				connection.udp = new UdpConnection(serialization, connection.tcp.readBuffer.capacity());
-			}
-
-			final long endTime;
-			synchronized (updateLock) {
-				tcpRegistered = false;
-				selector.wakeup();
-				endTime = System.currentTimeMillis() + timeout;
-				connection.tcp.connect(selector, new InetSocketAddress(host, tcpPort), 5000);
-			}
-
-			// Wait for RegisterTCP.
-			synchronized (tcpRegistrationLock) {
-				while (!tcpRegistered && System.currentTimeMillis() < endTime) {
-					try {
-						tcpRegistrationLock.wait(100);
-					} catch (InterruptedException ignored) {
-					}
-				}
-				if (!tcpRegistered) {
-					throw new SocketTimeoutException("Connected, but timed out during TCP registration.\n"
-							+ "Note: Client#update must be called in a separate thread during connect.");
-				}
-			}
-
-			if (udpPort != -1) {
-				final InetSocketAddress udpAddress = new InetSocketAddress(host, udpPort);
-				synchronized (updateLock) {
-					udpRegistered = false;
-					selector.wakeup();
-					connection.udp.connect(selector, udpAddress);
-				}
-
-				// Wait for RegisterUDP reply.
-				synchronized (udpRegistrationLock) {
-					while (!udpRegistered && System.currentTimeMillis() < endTime) {
-						final RegisterUDP registerUDP = new RegisterUDP();
-						registerUDP.connectionID = connection.id;
-						connection.udp.send(connection, registerUDP, udpAddress);
-						try {
-							udpRegistrationLock.wait(100);
-						} catch (InterruptedException ignored) {
-						}
-					}
-					if (!udpRegistered) {
-						throw new SocketTimeoutException("Connected, but timed out during UDP registration: " + host + ":" + udpPort);
-					}
-				}
-			}
+			connectTcpAndUdp(timeout, host, tcpPort, udpPort);
 		} catch (IOException ex) {
 			close();
 			throw ex;
+		}
+	}
+
+	private void connectTcpAndUdp(int timeout, @Nonnull InetAddress host, int tcpPort, int udpPort) throws IOException {
+		if (udpPort != -1) {
+			connection.udp = new UdpConnection(serialization, connection.tcp.readBuffer.capacity());
+		}
+
+		final long endTime;
+		synchronized (updateLock) {
+			tcpRegistered = false;
+			selector.wakeup();
+			endTime = System.currentTimeMillis() + timeout;
+			connection.tcp.connect(selector, new InetSocketAddress(host, tcpPort), 5000);
+		}
+
+		// Wait for RegisterTCP.
+		synchronized (tcpRegistrationLock) {
+			connectTcp(endTime);
+		}
+
+		if (udpPort != -1) {
+			connectUdp(host, udpPort, endTime);
+		}
+	}
+
+	private void connectTcp(long endTime) throws SocketTimeoutException {
+		while (!tcpRegistered && System.currentTimeMillis() < endTime) {
+			try {
+				tcpRegistrationLock.wait(100);
+			} catch (InterruptedException ignored) {
+			}
+		}
+		if (!tcpRegistered) {
+			throw new SocketTimeoutException("Connected, but timed out during TCP registration.\n"
+					+ "Note: Client#update must be called in a separate thread during connect.");
+		}
+	}
+
+	private void connectUdp(@Nonnull InetAddress host, int udpPort, long endTime) throws IOException {
+		final InetSocketAddress udpAddress = new InetSocketAddress(host, udpPort);
+		synchronized (updateLock) {
+			udpRegistered = false;
+			selector.wakeup();
+			connection.udp.connect(selector, udpAddress);
+		}
+
+		// Wait for RegisterUDP reply.
+		synchronized (udpRegistrationLock) {
+			while (!udpRegistered && System.currentTimeMillis() < endTime) {
+				final RegisterUDP registerUDP = new RegisterUDP();
+				registerUDP.connectionID = connection.id;
+				connection.udp.send(connection, registerUDP, udpAddress);
+				try {
+					udpRegistrationLock.wait(100);
+				} catch (InterruptedException ignored) {
+				}
+			}
+			if (!udpRegistered) {
+				throw new SocketTimeoutException("Connected, but timed out during UDP registration: " + host + ":" + udpPort);
+			}
 		}
 	}
 
@@ -355,43 +367,16 @@ public class Client implements EndPoint {
 	private void updateForUdp() throws IOException {
 		while (true) {
 			final Object object = connection.tcp.readObject(connection);
-			if (object == null) break;
+			if (object == null) {
+				break;
+			}
 			if (!tcpRegistered) {
-				if (object instanceof RegisterTCP) {
-					connection.id = ((RegisterTCP) object).connectionID;
-					synchronized (tcpRegistrationLock) {
-						tcpRegistered = true;
-						tcpRegistrationLock.notifyAll();
-						if (TRACE) {
-							trace("kryonet", this + " received TCP: RegisterTCP");
-						}
-						if (connection.udp == null) {
-							connection.setConnected(true);
-						}
-					}
-					if (connection.udp == null) {
-						connection.notifyConnected();
-					}
-				}
+				registerTcp(object);
 				continue;
 			}
 
 			if (connection.udp != null && !udpRegistered) {
-				if (object instanceof RegisterUDP) {
-					synchronized (udpRegistrationLock) {
-						udpRegistered = true;
-						udpRegistrationLock.notifyAll();
-						if (TRACE) {
-							trace("kryonet", this + " received UDP: RegisterUDP");
-						}
-						if (DEBUG) {
-							debug("kryonet", "Port " + connection.udp.datagramChannel.socket().getLocalPort()
-									+ "/UDP connected to: " + connection.udp.connectedAddress);
-						}
-						connection.setConnected(true);
-					}
-					connection.notifyConnected();
-				}
+				registerUdp(object);
 				continue;
 			}
 
@@ -409,6 +394,44 @@ public class Client implements EndPoint {
 			}
 			connection.notifyReceived(object);
 		}
+	}
+
+	private void registerUdp(Object object) {
+		if (object instanceof RegisterUDP) {
+			synchronized (udpRegistrationLock) {
+				udpRegistered = true;
+				udpRegistrationLock.notifyAll();
+				if (TRACE) {
+					trace("kryonet", this + " received UDP: RegisterUDP");
+				}
+				if (DEBUG) {
+					debug("kryonet", "Port " + connection.udp.datagramChannel.socket().getLocalPort()
+							+ "/UDP connected to: " + connection.udp.connectedAddress);
+				}
+				connection.setConnected(true);
+			}
+			connection.notifyConnected();
+		}
+	}
+
+	private void registerTcp(Object object) {
+		if (object instanceof RegisterTCP) {
+			connection.id = ((RegisterTCP) object).connectionID;
+			synchronized (tcpRegistrationLock) {
+				tcpRegistered = true;
+				tcpRegistrationLock.notifyAll();
+				if (TRACE) {
+					trace("kryonet", this + " received TCP: RegisterTCP");
+				}
+				if (connection.udp == null) {
+					connection.setConnected(true);
+				}
+			}
+			if (connection.udp == null) {
+				connection.notifyConnected();
+			}
+		}
+		return;
 	}
 
 	private void incEmptySelectsAndSleepIfThresholdIsMet(long startTime) {
