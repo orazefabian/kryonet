@@ -31,7 +31,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 @ExtendWith(KryonetExtension.class)
-public class DeflateTest {
+class DeflateTest {
 	static public void register(Kryo kryo) {
 		kryo.register(short[].class);
 		kryo.register(SomeData.class, new DeflateSerializer(new FieldSerializer(kryo, SomeData.class)));
@@ -39,7 +39,7 @@ public class DeflateTest {
 	}
 
 	@Test
-	public void testDeflate(KryonetExtension.Kryonet extension) throws IOException {
+	void testDeflate(KryonetExtension.Kryonet extension) throws IOException {
 		final Server server = new Server();
 		register(server.getKryo());
 

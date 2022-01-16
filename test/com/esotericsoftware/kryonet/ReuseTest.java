@@ -28,9 +28,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @ExtendWith(KryonetExtension.class)
-public class ReuseTest {
+class ReuseTest {
 	@Test
-	public void testPingPong(KryonetExtension.Kryonet extension) throws IOException, InterruptedException {
+	void testPingPong(KryonetExtension.Kryonet extension) throws IOException, InterruptedException {
 		final AtomicInteger stringCount = new AtomicInteger(0);
 
 		final Server server = new Server();

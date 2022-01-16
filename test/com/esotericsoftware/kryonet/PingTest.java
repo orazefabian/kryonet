@@ -26,10 +26,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import java.io.IOException;
 
 @ExtendWith(KryonetExtension.class)
-public class PingTest {
+class PingTest {
 
 	@Test
-	public void testPing(KryonetExtension.Kryonet extension) throws IOException {
+	void testPing(KryonetExtension.Kryonet extension) throws IOException {
 		final Server server = new Server();
 		extension.startEndPoint(server);
 		server.bind(extension.tcpPort);

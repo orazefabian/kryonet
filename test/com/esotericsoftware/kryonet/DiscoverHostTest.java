@@ -37,10 +37,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 @ExtendWith(KryonetExtension.class)
-public class DiscoverHostTest {
+class DiscoverHostTest {
 
 	@Test
-	public void testBroadcast(KryonetExtension.Kryonet extension) throws IOException {
+	void testBroadcast(KryonetExtension.Kryonet extension) throws IOException {
 		// This server exists solely to reply to Client#discoverHost.
 		// It wouldn't be needed if the real server was using UDP.
 		final Server broadcastServer = new Server();
@@ -75,7 +75,7 @@ public class DiscoverHostTest {
 	}
 
 	@Test
-	public void testCustomBroadcast(KryonetExtension.Kryonet extension) throws IOException {
+	void testCustomBroadcast(KryonetExtension.Kryonet extension) throws IOException {
 		final AtomicInteger port = new AtomicInteger();
 
 		ServerDiscoveryHandler serverDiscoveryHandler = new ServerDiscoveryHandler() {

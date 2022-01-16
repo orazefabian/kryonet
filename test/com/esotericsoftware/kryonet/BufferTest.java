@@ -27,12 +27,12 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @ExtendWith(KryonetExtension.class)
-public class BufferTest {
+class BufferTest {
 	AtomicInteger received = new AtomicInteger();
 	AtomicInteger receivedBytes = new AtomicInteger();
 
 	@Test
-	public void testManyLargeMessages(KryonetExtension.Kryonet extension) throws IOException {
+	void testManyLargeMessages(KryonetExtension.Kryonet extension) throws IOException {
 		final int messageCount = 1024;
 		int objectBufferSize = 10250;
 		int writeBufferSize = 10250 * messageCount;

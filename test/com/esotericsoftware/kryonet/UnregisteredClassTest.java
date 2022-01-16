@@ -30,9 +30,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 @ExtendWith(KryonetExtension.class)
-public class UnregisteredClassTest {
+class UnregisteredClassTest {
 	@Test
-	public void testUnregisteredClasses(KryonetExtension.Kryonet extension) throws IOException {
+	void testUnregisteredClasses(KryonetExtension.Kryonet extension) throws IOException {
 		final Data dataTCP = new Data();
 		populateData(dataTCP, true);
 		final Data dataUDP = new Data();

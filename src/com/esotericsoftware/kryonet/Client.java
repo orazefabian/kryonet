@@ -65,7 +65,6 @@ public class Client implements EndPoint {
 
 	@CheckForNull private Thread updateThread;
 
-	// TODO: extract tcp properties in it's own class
 	@CheckForNull private InetAddress connectHost;
 	@Nonnull private final Selector selector;
 	private volatile boolean tcpRegistered;
@@ -74,7 +73,6 @@ public class Client implements EndPoint {
 	private int connectTimeout;
 	@Nonnull private final Object tcpRegistrationLock = new Object();
 
-	// todo sometime else: extract udp stuff
 	private volatile boolean udpRegistered;
 	private int connectUdpPort;
 	@Nonnull private final Object udpRegistrationLock = new Object();
@@ -287,7 +285,7 @@ public class Client implements EndPoint {
 		final int readySelects = timeout > 0 ? selector.select(timeout) :  selector.selectNow();
 
 		if (readySelects == 0) {
-			incEmptySelectsAndMaybeSleep(startTime);
+			incEmptySelectsAndSleepIfThresholdIsMet(startTime);
 		} else {
 			updateForSelect();
 		}
@@ -297,8 +295,9 @@ public class Client implements EndPoint {
 			if (connection.tcp.isTimedOut(time)) {
 				if (DEBUG) debug("kryonet", this + " timed out.");
 				close();
-			} else
+			} else {
 				keepAlive();
+			}
 			if (connection.isIdle()) connection.notifyIdle();
 		}
 	}
@@ -412,7 +411,7 @@ public class Client implements EndPoint {
 		}
 	}
 
-	private void incEmptySelectsAndMaybeSleep(long startTime) {
+	private void incEmptySelectsAndSleepIfThresholdIsMet(long startTime) {
 		emptySelects++;
 		if (emptySelects == 100) {
 			emptySelects = 0;

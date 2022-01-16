@@ -28,11 +28,11 @@ import java.util.ArrayList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @ExtendWith(KryonetExtension.class)
-public class MultipleThreadTest {
-	int receivedServer, receivedClient1, receivedClient2;
+class MultipleThreadTest {
+	int receivedServer;
 
 	@Test
-	public void testMultipleThreads(KryonetExtension.Kryonet extension) throws IOException {
+	void testMultipleThreads(KryonetExtension.Kryonet extension) throws IOException {
 		receivedServer = 0;
 
 		final int messageCount = 10;
